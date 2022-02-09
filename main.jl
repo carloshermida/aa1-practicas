@@ -39,4 +39,19 @@ dataset_haber = readdlm("haberman.data",',');
 cat_indexes_haber = 4;
 dataset_haber = cat_to_num(dataset_haber, cat_indexes_haber);
 #######################################
-####################################
+
+m= maximum(dataset_haber[:,1:3], dims=1)
+mi=minimum(dataset_haber[:,1:3], dims=1)
+using Statistics
+media=mean(dataset_haber[:,1:3], dims=1)
+sd= std(dataset_haber[:,1:3], dims=1)
+
+
+d=dataset_haber[:,1:3]
+let info=zeros(0)
+for i=1:size(d, 2)
+    c=dataset_haber[:,i]
+    append!(info,[maximum(c, dims=1) minimum(c, dims=1) mean(c, dims=1) std(c, dims=1)])
+end
+info
+end
