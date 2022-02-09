@@ -45,13 +45,23 @@ mi=minimum(dataset_haber[:,1:3], dims=1)
 using Statistics
 media=mean(dataset_haber[:,1:3], dims=1)
 sd= std(dataset_haber[:,1:3], dims=1)
+info=[m mi media sd]
 
 
 d=dataset_haber[:,1:3]
-let info=zeros(0)
+let info=rand(size(d, 2),4)
 for i=1:size(d, 2)
     c=dataset_haber[:,i]
-    append!(info,[maximum(c, dims=1) minimum(c, dims=1) mean(c, dims=1) std(c, dims=1)])
+    m= maximum(c, dims=1)
+    mi=minimum(c, dims=1)
+    media=mean(c, dims=1)
+    sd= std(c, dims=1)
+    info[i,:]=[m mi media sd]
 end
 info
 end
+
+media=transpose(info[:,3])
+sd=transpose(info[:,4])
+norm= (d.-media)./sd
+norm
