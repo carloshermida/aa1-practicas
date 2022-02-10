@@ -39,7 +39,6 @@ dataset_haber = readdlm("haberman.data",',');
 cat_indexes_haber = 4;
 dataset_haber = cat_to_num(dataset_haber, cat_indexes_haber);
 #######################################
-#
 
 m= maximum(dataset_haber[:,1:3], dims=1)
 mi=minimum(dataset_haber[:,1:3], dims=1)
@@ -50,7 +49,8 @@ info=[m mi media sd]
 
 
 d=dataset_haber[:,1:3]
-let info=rand(size(d, 2),4)
+# let info=rand(size(d, 2),4)
+info=rand(size(d, 2),4)
 for i=1:size(d, 2)
     c=dataset_haber[:,i]
     m= maximum(c, dims=1)
@@ -60,9 +60,11 @@ for i=1:size(d, 2)
     info[i,:]=[m mi media sd]
 end
 info
-end
 
 media=transpose(info[:,3])
 sd=transpose(info[:,4])
 norm= (d.-media)./sd
-norm
+
+maximos=transpose(info[:,1])
+minimos=transpose(info[:,2])
+norm_2= (d.-minimos)./(maximos.-minimos)
