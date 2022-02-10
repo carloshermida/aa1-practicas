@@ -39,6 +39,7 @@ dataset_haber = readdlm("haberman.data",',');
 cat_indexes_haber = 4;
 dataset_haber = cat_to_num(dataset_haber, cat_indexes_haber);
 #######################################
+#
 
 m= maximum(dataset_haber[:,1:3], dims=1)
 mi=minimum(dataset_haber[:,1:3], dims=1)
