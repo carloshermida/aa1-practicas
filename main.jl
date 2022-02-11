@@ -26,6 +26,9 @@ function cat_to_num(dataset, cat_indexes)
     return dataset;
 end
 
+########## MODIFICAR ESTA FUNCION COMO LA PIDE EL ENUNCIADO
+########## Y QUE DEVUELVA UNA MATRIZ DE SALIDA
+
 #######################################
 ### INDICA EL DATASET Y LOS INDICES ###
 #######################################
@@ -50,6 +53,18 @@ sd= std(d, dims=1)
 
 # Normalizar por columnas de la primera forma:
 norm = (d.-media)./sd
+for i=1:size(d,2)
+    if sd[i]==0
+        norm[:,i].=0
+    end
+end
+norm
 
 # Normalizar por columnas de la segunda forma:
-norm_2 = (d.-mi)./(ma.-mi)
+norm_2 = (d.-mi)./(m.-mi)
+for i=1:size(d,2)
+    if mi[i]==m[i]
+        norm_2[:,i].=0
+    end
+end
+norm_2
