@@ -65,3 +65,49 @@ for i=1:size(d,2)
     end
 end
 norm_2
+
+
+
+########avances de hoy
+function oneHotEncoding(feature, classes)
+    feature = convert(AbstractArray{Any},feature);
+    #target_options = unique(classes, dims = 1);
+
+    if length(classes) == 2
+        feature=feature.==classes[1]
+        reshape(feature, (length(feature),1))
+        return feature;
+    else length(classes) > 2
+        bool_matrix=falses(length(feature),length(classes))
+        for i=1:length(classes)
+            bool_matrix[:,i]=(feature.==classes[i])
+        end
+        return bool_matrix;
+    end
+end
+
+# Pasar a binario las categóricas
+using DelimitedFiles
+
+dataset_iris = readdlm("Downloads/trabajo_ti/iris.data",',');
+reshape(dataset_iris, (5,150))
+permutedims(dataset_iris)
+adjoint(dataset_iris,)
+classes=unique(dataset_iris[5,:])
+
+
+target_index_iris = 5;
+dataset_iris = cat_to_num(dataset_iris, target_index_iris);
+
+##############################################################
+
+dataset_haber = readdlm("Downloads/trabajo_ti/haberman.data",',');
+dataset_haber=dataset_haber'
+
+classes=unique(dataset_haber[4,:])
+#target_options = unique(classes, dims = 1)
+
+feature=dataset_haber[4,:]
+feature = convert(Array{Any},feature);
+d=oneHotEncoding(feature, classes)
+#target_options = unique(classes, dims = 1);
