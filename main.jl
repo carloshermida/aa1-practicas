@@ -4,9 +4,8 @@
 
 ############################## FUNCIONES ##############################
 
-function oneHotEncoding(feature, classes)
+function oneHotEncoding(feature::AbstractArray{<:Any,1}, classes)
     """Función para pasar de variable categorica a numérica binaria"""
-    feature = convert(AbstractArray{Any},feature);
     if length(classes) == 2
         feature=feature.==classes[1]
         reshape(feature, (length(feature),1))
@@ -22,11 +21,10 @@ function oneHotEncoding(feature, classes)
 end
 
 # Función sobrecargada 1
-#oneHotEncoding(outputs::AbstractArray{<:Any,1}, feature::AbstractArray{Any})=(classes=unique(feature);oneHotEncoding(feature, classes))
+oneHotEncoding(feature::AbstractArray{<:Any,1})=(classes=unique(feature);oneHotEncoding(feature, classes))
 
 # Función sobrecargada 2
-function oneHotEncoding(feature)
-    feature=convert(AbstractArray{Bool,1}, feature)
+function oneHotEncoding(feature::AbstractArray{Bool,1})
     classes=unique(feature)
     if length(classes) == 2
         feature=feature.==classes[1]
@@ -45,14 +43,17 @@ dataset_iris = permutedims(dataset_iris)
 classes_iris = unique(dataset_iris[5,:])
 feature_iris = dataset_iris[5,:]
 feature_iris = convert(Array{Any},feature_iris);
-feature_iris = oneHotEncoding(feature_iris, classes_iris)
+feature_iris2 = convert(AbstractArray{<:Any,1}, feature_iris)
+d = oneHotEncoding(feature_iris2, classes_iris)
 
 dataset_haber = readdlm("haberman.data",',');
 dataset_haber = dataset_haber'
 classes_haber = unique(dataset_haber[4,:])
 feature_haber = dataset_haber[4,:]
-feature_haber = convert(Array{Any},feature_haber);
-feature_haber = oneHotEncoding(feature_haber, classes_haber)
+feature_haber1 = convert(AbstractArray{<:Any,1},feature_haber);
+d = oneHotEncoding(feature_haber1, classes_haber)
+m = oneHotEncoding(d)
+
 
 ##### Normalización
 
