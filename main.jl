@@ -53,17 +53,73 @@ feature_haber = dataset_haber[4,:]
 feature_haber1 = convert(AbstractArray{<:Any,1},feature_haber);
 d = oneHotEncoding(feature_haber1, classes_haber)
 m = oneHotEncoding(d)
-
+numerics_haber=dataset_haber[1:3,:]'
 
 ##### Normalización
 
-# Para obtener las filas con las medias, maximos, mínimos y sd
-d = dataset_haber[:,1:3]
-m= maximum(d, dims=1)
-mi=minimum(d, dims=1)
+# obtener max y min
+function calculateMinMaxNormalizationParameters(numerics::AbstractArray{<:Real,2})
+    m= maximum(numerics, dims=1)
+    mi=minimum(numerics, dims=1)
+    return (m, mi)
+end
+calculateMinMaxNormalizationParameters(numerics_haber)
+
+
+# obtener media sd
 using Statistics
-media=mean(d, dims=1)
-sd= std(d, dims=1)
+function calculateZeroMeanNormalizationParameters(numerics::AbstractArray{<:Real,2})
+    media=mean(numerics, dims=1)
+    sd= std(numerics, dims=1)
+    return (media, sd)
+end
+
+calculateZeroMeanNormalizationParameters(numerics_haber)
+
+# normalizaciion max min 1
+function normalizeMinMax!(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
+    return (numerics.-MinMax[2])./(MinMax[1].-MinMax[2])
+end
+
+# normalizacion max min 2
+normalizeMinMax!(numerics::AbstractArray{<:Real,2})=(normalizeMinMax!(numerics, calculateMinMaxNormalizationParameters(numerics)))
+normalizeMinMax!(numerics_haber)
+
+# normalizacion max min 3
+function normalizeMinMax(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
+    copia=copy(numerics)
+    return (copia.-MinMax[2])./(MinMax[1].-MinMax[2])
+end
+
+# normalizacion max min 4
+normalizeMinMax(numerics_haber, calculateMinMaxNormalizationParameters(numerics_haber))
+
+normalizeMinMax(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeMinMax(copia, calculateMinMaxNormalizationParameters(numerics)))
+normalizeMinMax(numerics_haber)
+
+# normalizacion media sd 1
+function normalizeZeroMean!(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
+    return (numerics.-media_sd[1])./media_sd[2]
+end
+
+# normalizacion media sd 2
+normalizeZeroMean!(numerics_haber,calculateZeroMeanNormalizationParameters(numerics_haber))
+
+normalizeZeroMean!(numerics::AbstractArray{<:Real,2})=(normalizeZeroMean!(numerics,calculateZeroMeanNormalizationParameters(numerics_haber)))
+normalizeZeroMean!(numerics_haber)
+
+# normalizacion media sd 3
+function normalizeZeroMean(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
+    copia=copy(numerics)
+    return (copia.-media_sd[1])./media_sd[2]
+end
+
+# normalizacion media sd 4
+normalizeZeroMean(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeZeroMean(copia,calculateZeroMeanNormalizationParameters(numerics)))
+
+normalizeZeroMean(numerics_haber)
+
+
 
 # Normalizar por columnas de la primera forma:
 norm = (d.-media)./sd
