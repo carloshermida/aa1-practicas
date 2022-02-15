@@ -99,11 +99,11 @@ normalizeZeroMean(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);norma
 function classifyOutputs(outputs::AbstractArray{<:Real,2}, threshold = 0.5)
     columns = size(outputs)[2]
     if columns == 1
-        outputs .>= threshold
+        outputs = outputs .>= threshold
     else
         (_,indicesMaxEachInstance) = findmax(outputs, dims=2);
         outputs = falses(size(outputs));
-        outputs[indicesMaxEachInstance] .= true;
+        outputs[indicesMaxEachInstance] = outputs[indicesMaxEachInstance] .= true;
     end
     return outputs
 end
@@ -124,15 +124,38 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{Bool,2}
     if columns == 1
         targets = (targets[:,1])
         outputs = (outputs[:,1])
-        accuracy(targets, outputs)
+        return accuracy(targets, outputs)
     else
         classComparison = falses(rows,1)
         for row = 1:rows
             classComparison[row,1] = targets[row,:] == outputs[row,:]
         end
-        return classComparison
+        return sum(classComparison)/length(classComparison)
     end
 end
+
+# Función sobrecargada 3
+function accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{<:Real,1}, threshold = 0.5)
+    outputs = outputs .>= threshold
+    return accuracy(targets, outputs)
+end
+
+# Función sobrecargada 4
+function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,2})
+    rows = size(outputs)[1]
+    columns = size(outputs)[2]
+    if columns == 1
+        targets = (targets[:,1])
+        outputs = (outputs[:,1])
+        return accuracy(targets, outputs)
+    else
+        outputs = classifyOutputs(outputs)
+        print(outputs)
+        return accuracy(targets, outputs)
+    end
+end
+
+
 
 ##
 ############################### CÓDIGO ###############################
@@ -198,6 +221,6 @@ end
 
 ##### Test accuracy functions
 
-targets = falses(4,2)
-outputs = falses(4,2)
+targets = convert(AbstractArray{Bool,2}, reshape([1,0,0,1], (2,2)))
+outputs = reshape([0,2,0,1], (2,2))
 accuracy(targets, outputs)
