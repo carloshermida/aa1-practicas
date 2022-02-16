@@ -5,6 +5,7 @@
 
 using Statistics
 using DelimitedFiles
+using Flux
 
 ############################## FUNCIONES ##############################
 
@@ -156,6 +157,27 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,
 end
 
 
+### red neuronal artificial
+
+function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
+    ann = Chain();
+    numInputsLayer = n_input
+    for numOutputsLayer = topology
+        ann = Chain(ann..., Dense(numInputsLayer, numOutputsLayer, σ) );
+        numInputsLayer = numOutputsLayer;
+    end
+    if n_output <= 2
+        ann = Chain(ann...,  Dense(numInputsLayer, n_output, σ) );
+    else
+        ann = Chain(ann...,  Dense(numInputsLayer, n_output, identity), softmax);
+    end
+    return ann
+end
+
+dataset_haber = readdlm("haberman.data",',');
+inputs = normalizeMinMax!(dataset_haber)
+red = rna(([2,2]), 306, 306)
+red(inputs)
 
 ##
 ############################### CÓDIGO ###############################
