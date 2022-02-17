@@ -167,17 +167,25 @@ function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
         numInputsLayer = numOutputsLayer;
     end
     if n_output <= 2
-        ann = Chain(ann...,  Dense(numInputsLayer, n_output, σ) );
+        ann = Chain(ann...,  Dense(numInputsLayer, 1, σ) );
     else
-        ann = Chain(ann...,  Dense(numInputsLayer, n_output, identity), softmax);
+        ann = Chain(ann...,  Dense(numInputsLayer, ###n_output, identity), softmax);
     end
     return ann
 end
 
 dataset_haber = readdlm("haberman.data",',');
-inputs = normalizeMinMax!(dataset_haber)
-red = rna(([2,2]), 306, 306)
-red(inputs)
+dataset_haber = dataset_haber'
+feature_haber = dataset_haber[4,:]
+feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
+target = oneHotEncoding(feature_haber)
+numerics_haber = dataset_haber[1:3,:]'
+input = normalizeMinMax!(numerics_haber)
+x = input'
+
+red = rna(([3]), 3, ###2)
+red(x)
+
 
 ##
 ############################### CÓDIGO ###############################
