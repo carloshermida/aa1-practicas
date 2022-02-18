@@ -151,7 +151,6 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,
         return accuracy(targets, outputs)
     else
         outputs = classifyOutputs(outputs)
-        print(outputs)
         return accuracy(targets, outputs)
     end
 end
@@ -169,10 +168,32 @@ function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
     if n_output <= 2
         ann = Chain(ann...,  Dense(numInputsLayer, 1, σ) );
     else
-        ann = Chain(ann...,  Dense(numInputsLayer, ###n_output, identity), softmax);
+        ann = Chain(ann...,  Dense(numInputsLayer, n_output, identity), softmax);
     end
     return ann
 end
+
+############################################## CAMBIOS 
+
+
+function train!(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
+    dataset = (dataset[1],Matrix(dataset[2]'))  ## trasponemos el output
+    n_inputs = size(dataset[1])[1]
+    n_outputs = size(dataset[2])[1]
+    red = rna(topology, n_inputs, n_outputs)
+    return red(dataset[1])
+end
+
+function train!(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
+    outputs = dataset[2]
+    x = outputs .== 0
+    outputs = [outputs x]
+    inputs = dataset[1]
+    dataset = tuple(inputs, outputs)
+    return train!(topology, dataset, maxEpochs, minLoss, learningRate)
+end
+
+################
 
 dataset_haber = readdlm("haberman.data",',');
 dataset_haber = dataset_haber'
@@ -181,10 +202,33 @@ feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
 target = oneHotEncoding(feature_haber)
 numerics_haber = dataset_haber[1:3,:]'
 input = normalizeMinMax!(numerics_haber)
-x = input'
 
-red = rna(([3]), 3, ###2)
-red(x)
+###############
+
+dataset_iris = readdlm("iris.data",',');
+dataset_iris = permutedims(dataset_iris)
+feature_iris = dataset_iris[5,:]
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+target = oneHotEncoding(feature_iris)
+numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
+input = normalizeMinMax!(numerics_iris)
+
+#############
+
+dataset = (Matrix(input'), target)
+# trasponemos solo el input
+# Si target es un vector, lo convertía en matriz y por tanto no entraría en
+# su función
+
+let sol = 0
+    for _ = 1:100
+        sol = train!([3], dataset)
+    end
+    sol
+end
+
+
+
 
 
 ##
