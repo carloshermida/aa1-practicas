@@ -173,62 +173,29 @@ function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
     return ann
 end
 
-############################################## CAMBIOS 
 
+### entrenamiento
 
-function train!(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
-    dataset = (dataset[1],Matrix(dataset[2]'))  ## trasponemos el output
+function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
+    dataset = (Matrix(dataset[1]'),Matrix(dataset[2]')) # Trasponemos las matrices para que los patrones estén en columnas
     n_inputs = size(dataset[1])[1]
     n_outputs = size(dataset[2])[1]
-    red = rna(topology, n_inputs, n_outputs)
-    return red(dataset[1])
-end
-
-function train!(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
-    outputs = dataset[2]
-    x = outputs .== 0
-    outputs = [outputs x]
-    inputs = dataset[1]
-    dataset = tuple(inputs, outputs)
-    return train!(topology, dataset, maxEpochs, minLoss, learningRate)
-end
-
-################
-
-dataset_haber = readdlm("haberman.data",',');
-dataset_haber = dataset_haber'
-feature_haber = dataset_haber[4,:]
-feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
-target = oneHotEncoding(feature_haber)
-numerics_haber = dataset_haber[1:3,:]'
-input = normalizeMinMax!(numerics_haber)
-
-###############
-
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
-target = oneHotEncoding(feature_iris)
-numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = normalizeMinMax!(numerics_iris)
-
-#############
-
-dataset = (Matrix(input'), target)
-# trasponemos solo el input
-# Si target es un vector, lo convertía en matriz y por tanto no entraría en
-# su función
-
-let sol = 0
-    for _ = 1:100
-        sol = train!([3], dataset)
+    red = rna(topology, n_inputs, n_outputs) # Creamos la red adecuada a la base de datos
+    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y); # Definimos la función loss en base a nuestra red (copiada del pdf)
+    losses = zeros(0) # Vamos a almacenar el loss de cada ciclo de entrenamiento en esta variable
+    for _ = 1:100   # Número de ciclos de entrenamiento (lo puse aleatorio). Se regulará en la siguiente práctica
+        Flux.train!(loss, params(red), [dataset], ADAM(learningRate));  # Entrenamos la red con la función train! de la libreria FLux (copiado del pdf)
+        append!(losses, loss(dataset[1],dataset[2])) # Añadimos el loss de cada ciclo
     end
-    sol
+    return (red, losses) # Devolvemos la red entrenada y el vector de losses
 end
 
-
-
+function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
+    target = reshape(dataset[2], (length(dataset[2]),1)) # Cambiamos el vector target a una matriz columna. No es necesario crear la columna contraria, porque cuando utilicemos la red entrenada, devolverá una matriz columna con valores entre 0 y 1, y a través del umbral ya decide si pertenece a la clase A o a la clase B
+    inputs = dataset[1]                                  # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
+    dataset = tuple(inputs, target)
+    return entrenar(topology, dataset, maxEpochs, minLoss, learningRate) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
+end
 
 
 ##
@@ -293,8 +260,75 @@ for i=1:size(d,2)
     end
 end
 
-##### Test accuracy functions
+##### Entrenamiento de red
 
-targets = convert(AbstractArray{Bool,2}, reshape([1,0,0,1], (2,2)))
-outputs = reshape([0,2,0,1], (2,2))
-accuracy(targets, outputs)
+### HABERMAN
+
+dataset_haber = readdlm("haberman.data",','); # Cargamos los datos
+dataset_haber = dataset_haber'
+feature_haber = dataset_haber[4,:]
+feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
+target = oneHotEncoding(feature_haber)
+numerics_haber = dataset_haber[1:3,:]'
+input = normalizeMinMax!(numerics_haber)
+
+dataset = (input, target) # Creamos la tupla con los datos (sin trasponer, ya lo hace dentro)
+red_entrenada,losses = entrenar([3], dataset) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
+# Esto a simple vista devuelve la misma red, pero si le aplicamos la funcióin params(red) antes y despues del bucle de entrenamiento, observamos que los pesos cambian
+
+output = red_entrenada(input') # Le pasamos a la red entrenada un input (en este caso es el mismo con el qque entrenó), para que nos devuelva la probabilidad de pertenencia a cada clase
+target = reshape(target, (length(target),1)) # Convertimos target en una matriz columna para poder llamar a la función accuracy
+accuracy(target, Matrix(output')) # Acuraccy nos devuelve el porcentaje de acierto (como output es una matriz columna, convertimos antes target para que entre en el accuracy {bool,2} , {real,2}, porque no hay {bool,1} , {real,2})
+
+### IRIS
+
+dataset_iris = readdlm("iris.data",',');
+dataset_iris = permutedims(dataset_iris)
+feature_iris = dataset_iris[5,:]
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+target = oneHotEncoding(feature_iris)
+numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
+input = normalizeMinMax!(numerics_iris)
+
+dataset = (input, target)
+red_entrenada,losses = entrenar([3], dataset)
+
+output = red_entrenada(input')
+accuracy(target, Matrix(output'))
+
+
+
+
+###################################################
+# Bucle para comprobar la mejor arquitectura
+#####################
+
+# Es un bucle que comprueba la mejor arquitectura para la red suponiendo el número de capas ocultas = 2
+# La que obtenga una mejor accuracy es la combinación óptima. En este caso probamos entre 1 y 4 neuronas por capa
+
+# Calculamos la media de 10 entrenamientos por arquitectura, pues no siempre obtemos la misma precisión
+
+"""
+let
+    best = 0
+    match = 0
+    for i = 1:4
+        for j = 1:4
+            x = zeros(0)
+            for _ = 1:10
+                dataset = (input, target)
+                red_entrenada,losses = entrenar([i,j], dataset)
+                output = red_entrenada(input')
+                append!(x, accuracy(target, Matrix(output')))
+            end
+            result = mean(x)
+            print(i, "\t", j, "\t", result, "\n")
+            if result > best
+                best = result
+                match = (i, j, best)
+            end
+        end
+    end
+    print("BEST: ", match[1], "\t", match[2], "\t", match[3])
+end
+"""
