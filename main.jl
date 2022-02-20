@@ -78,7 +78,15 @@ end
 
 # Función sobrecargada 1
 function normalizeZeroMean!(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
-    return (numerics.-media_sd[1])./media_sd[2]
+    print("EHHH")
+    norm = (numerics.-media_sd[1])./media_sd[2]
+    for i=1:size(numerics,2)
+        if media_sd[2][i]==0
+            norm[:,i].=0
+        end
+    end
+
+    return norm
 end
 
 # Función sobrecargada 2
@@ -87,7 +95,14 @@ normalizeZeroMean!(numerics::AbstractArray{<:Real,2})=(normalizeZeroMean!(numeri
 # Función sobrecargada 3
 function normalizeZeroMean(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
     copia=copy(numerics)
-    return (copia.-media_sd[1])./media_sd[2]
+    print("EHHH")
+    norm = (copia.-media_sd[1])./media_sd[2]
+    for i=1:size(copia,2)
+        if media_sd[2][i]==0
+            norm[:,i].=0
+        end
+    end
+    return norm
 end
 
 # Función sobrecargada 4
@@ -288,7 +303,22 @@ feature_iris = dataset_iris[5,:]
 feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
 target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = normalizeMinMax!(numerics_iris)
+input = calculateZeroMeanNormalizationParameters(numerics_iris)
+
+dataset = (input, target)
+red_entrenada,losses = entrenar([3], dataset)
+
+output = red_entrenada(input')
+accuracy(target, Matrix(output'))
+
+### IRIS (sin normalizar)
+
+dataset_iris = readdlm("iris.data",',');
+dataset_iris = permutedims(dataset_iris)
+feature_iris = dataset_iris[5,:]
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+target = oneHotEncoding(feature_iris)
+input = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 
 dataset = (input, target)
 red_entrenada,losses = entrenar([3], dataset)
