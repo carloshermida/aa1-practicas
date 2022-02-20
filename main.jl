@@ -51,7 +51,13 @@ end
 
 # Función sobrecargada 1
 function normalizeMinMax!(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
-    return (numerics.-MinMax[2])./(MinMax[1].-MinMax[2])
+    norm = (numerics.-MinMax[2])./(MinMax[1].-MinMax[2])
+    for i=1:size(numerics,2)
+        if MinMax[1][i]==MinMax[2][i]
+            norm[:,i].=0
+        end
+    end
+    return norm
 end
 
 # Función sobrecargada 2
@@ -60,7 +66,13 @@ normalizeMinMax!(numerics::AbstractArray{<:Real,2})=(normalizeMinMax!(numerics, 
 # Función sobrecargada 3
 function normalizeMinMax(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
     copia=copy(numerics)
-    return (copia.-MinMax[2])./(MinMax[1].-MinMax[2])
+    norm = (copia.-MinMax[2])./(MinMax[1].-MinMax[2])
+    for i=1:size(copia,2)
+        if MinMax[1][i]==MinMax[2][i]
+            norm[:,i].=0
+        end
+    end
+    return norm
 end
 
 # Función sobrecargada 4
@@ -78,7 +90,6 @@ end
 
 # Función sobrecargada 1
 function normalizeZeroMean!(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
-    print("EHHH")
     norm = (numerics.-media_sd[1])./media_sd[2]
     for i=1:size(numerics,2)
         if media_sd[2][i]==0
@@ -95,7 +106,6 @@ normalizeZeroMean!(numerics::AbstractArray{<:Real,2})=(normalizeZeroMean!(numeri
 # Función sobrecargada 3
 function normalizeZeroMean(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
     copia=copy(numerics)
-    print("EHHH")
     norm = (copia.-media_sd[1])./media_sd[2]
     for i=1:size(copia,2)
         if media_sd[2][i]==0
@@ -252,28 +262,6 @@ normalizeZeroMean!(numerics_haber)                                              
 normalizeZeroMean(numerics_haber,calculateZeroMeanNormalizationParameters(numerics_haber))  # Función sobrecargada 3
 normalizeZeroMean(numerics_haber)                                                           # Función sobrecargada 4
 
-##### Normalizar por columnas
-d = dataset_haber[:,1:3]
-m = maximum(d, dims=1)
-mi = minimum(d, dims=1)
-med = mean(d, dims=1)
-sd = std(d, dims=1)
-
-### Forma 1:
-norm = (d.-med)./sd
-for i=1:size(d,2)
-    if sd[i]==0
-        norm[:,i].=0
-    end
-end
-
-### Forma 2:
-norm_2 = (d.-mi)./(m.-mi)
-for i=1:size(d,2)
-    if mi[i]==m[i]
-        norm_2[:,i].=0
-    end
-end
 
 ##### Entrenamiento de red
 
@@ -303,7 +291,7 @@ feature_iris = dataset_iris[5,:]
 feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
 target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = calculateZeroMeanNormalizationParameters(numerics_iris)
+input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
 dataset = (input, target)
 red_entrenada,losses = entrenar([3], dataset)
@@ -325,8 +313,6 @@ red_entrenada,losses = entrenar([3], dataset)
 
 output = red_entrenada(input')
 accuracy(target, Matrix(output'))
-
-
 
 
 ###################################################
