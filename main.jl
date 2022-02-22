@@ -1,11 +1,12 @@
 
-#               PRÁCTICA APRENDIZAJE AUTOMÁTICO I / v1.2
+#               PRÁCTICA APRENDIZAJE AUTOMÁTICO I / v1.3
 #         Nina López | Borja Souto | Carmen Lozano | Carlos Hermida
 
 
 using Statistics
 using DelimitedFiles
 using Flux
+using Random
 
 ############################## FUNCIONES ##############################
 
@@ -181,7 +182,7 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,
 end
 
 
-### red neuronal artificial
+##### red neuronal artificial
 
 function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
     ann = Chain();
@@ -199,17 +200,24 @@ function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
 end
 
 
-### entrenamiento
+##### entrenamiento
 
-function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
+function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}},
+    maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)),
+    test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)), maxEpochsVal::Int = 20)
+
     dataset = (Matrix(dataset[1]'),Matrix(dataset[2]')) # Trasponemos las matrices para que los patrones estén en columnas
     n_inputs = size(dataset[1])[1]
     n_outputs = size(dataset[2])[1]
     red = rna(topology, n_inputs, n_outputs) # Creamos la red adecuada a la base de datos
     loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y); # Definimos la función loss en base a nuestra red (copiada del pdf)
     losses = zeros(0) # Vamos a almacenar el loss de cada ciclo de entrenamiento en esta variable
-    for _ = 1:100   # Número de ciclos de entrenamiento (lo puse aleatorio). Se regulará en la siguiente práctica
+    for _ = 1:2000   # Número de ciclos de entrenamiento (lo puse aleatorio). Se regulará en la siguiente práctica
         Flux.train!(loss, params(red), [dataset], ADAM(learningRate));  # Entrenamos la red con la función train! de la libreria FLux (copiado del pdf)
+
+        if validacion != tuple(zeros(0,0), falses(0,0))
+            print(loss(validacion[2], red(validacion)))
+        end
         append!(losses, loss(dataset[1],dataset[2])) # Añadimos el loss de cada ciclo
     end
     return (red, losses) # Devolvemos la red entrenada y el vector de losses
@@ -221,6 +229,32 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     dataset = tuple(inputs, target)
     return entrenar(topology, dataset, maxEpochs, minLoss, learningRate) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
 end
+
+
+##### sobreentrenamiento
+
+function holdOut(N, P)
+    d = randperm(N)
+    test = d[1:Integer(round(P*N))]
+    entrenamiento = d[Integer(round(P*N))+1:end]
+    return (entrenamiento, test)
+end
+
+
+#holdOut(150,0.3)
+
+function holdOut(N, Pval, Ptest)
+    d, test = holdOut(N, Ptest)
+    entrenamiento, validacion = holdOut(size(d)[1], Pval)
+    entrenamiento = d[entrenamiento]
+    validacion = d[validacion]
+    return (entrenamiento, validacion, test)
+end
+
+#holdOut(20,0.3, 0.1)
+
+
+
 
 
 ##
@@ -275,8 +309,8 @@ target = oneHotEncoding(feature_haber)
 numerics_haber = dataset_haber[1:3,:]'
 input = normalizeMinMax!(numerics_haber)
 
-dataset = (input, target) # Creamos la tupla con los datos (sin trasponer, ya lo hace dentro)
-red_entrenada,losses = entrenar([3], dataset) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
+dataset1 = (input, target) # Creamos la tupla con los datos (sin trasponer, ya lo hace dentro)
+red_entrenada,losses = entrenar([3], dataset1) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
 # Esto a simple vista devuelve la misma red, pero si le aplicamos la funcióin params(red) antes y despues del bucle de entrenamiento, observamos que los pesos cambian
 
 output = red_entrenada(input') # Le pasamos a la red entrenada un input (en este caso es el mismo con el qque entrenó), para que nos devuelva la probabilidad de pertenencia a cada clase
@@ -293,8 +327,15 @@ target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
-dataset = (input, target)
-red_entrenada,losses = entrenar([3], dataset)
+train_i, val_i, test_i = holdOut(size(input)[1], 0.1, 0.3)
+
+train = (input[train_i, 1:4], target[train_i, 1:3])
+val = (input[val_i, 1:4], target[val_i, 1:3])
+test = (input[test_i, 1:4], target[test_i, 1:3])
+
+train = (input, target)
+
+red_entrenada,losses = entrenar([3], dataset = train)
 
 output = red_entrenada(input')
 accuracy(target, Matrix(output'))
