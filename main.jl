@@ -215,7 +215,6 @@ function entrenar(;topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArra
     losses = zeros(0)
     cnt = 0
     best_loss = 100
-    best_red = 0
     for i = 1:maxEpochs
         Flux.train!(loss, params(red), [dataset], ADAM(learningRate))
         if validacion != tuple(zeros(0,0), falses(0,0))
@@ -239,11 +238,21 @@ function entrenar(;topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArra
 end
 
 # Función sobrecargada
-function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
-    target = reshape(dataset[2], (length(dataset[2]),1)) # Cambiamos el vector target a una matriz columna. No es necesario crear la columna contraria, porque cuando utilicemos la red entrenada, devolverá una matriz columna con valores entre 0 y 1, y a través del umbral ya decide si pertenece a la clase A o a la clase B
-    inputs = dataset[1]                                  # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
+function entrenar(; topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}},
+    maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,1}}=tuple(zeros(0,0), falses(0)),
+    validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,1}}=tuple(zeros(0,0), falses(0)), maxEpochsVal::Int = 20)
+
+    target = reshape(dataset[2], (length(dataset[2]),1))
+    target_test = reshape(test[2], (length(test[2]),1))
+    target_val = reshape(validacion[2], (length(validacion[2]),1))  # Cambiamos el vector target a una matriz columna. No es necesario crear la columna contraria, porque cuando utilicemos la red entrenada, devolverá una matriz columna con valores entre 0 y 1, y a través del umbral ya decide si pertenece a la clase A o a la clase B
+    inputs = dataset[1]
+    inputs_test = test[1]
+    inputs_val = validacion[1]                                # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
     dataset = tuple(inputs, target)
-    return entrenar(topology, dataset, maxEpochs, minLoss, learningRate) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
+    test = tuple(inputs_test, target_test)
+    validacion = tuple(inputs_val, target_val)
+    return entrenar(topology=topology, dataset=dataset, maxEpochs=maxEpochs, minLoss=minLoss, learningRate=learningRate, 
+                    test=test, validacion=validacion, maxEpochsVal=maxEpochsVal) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
 end
 
 
@@ -319,13 +328,18 @@ target = oneHotEncoding(feature_haber)
 numerics_haber = dataset_haber[1:3,:]'
 input = normalizeMinMax!(numerics_haber)
 
-dataset1 = (input, target) # Creamos la tupla con los datos (sin trasponer, ya lo hace dentro)
-red_entrenada,losses = entrenar([3], dataset1) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
+# Dividimos los datos en tres conjuntos
+train_h, val_h, test_h = holdOut(size(input)[1], 0.1, 0.3)
+train = (input[train_h, 1:3], target[train_h])
+val = (input[val_h, 1:3], target[val_h])
+test = (input[test_h, 1:3], target[test_h])
+
+red_entrenada,losses = entrenar(topology=[3], dataset=train, validacion=val) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
 # Esto a simple vista devuelve la misma red, pero si le aplicamos la funcióin params(red) antes y despues del bucle de entrenamiento, observamos que los pesos cambian
 
-output = red_entrenada(input') # Le pasamos a la red entrenada un input (en este caso es el mismo con el qque entrenó), para que nos devuelva la probabilidad de pertenencia a cada clase
-target = reshape(target, (length(target),1)) # Convertimos target en una matriz columna para poder llamar a la función accuracy
-accuracy(target, Matrix(output')) # Acuraccy nos devuelve el porcentaje de acierto (como output es una matriz columna, convertimos antes target para que entre en el accuracy {bool,2} , {real,2}, porque no hay {bool,1} , {real,2})
+# Obtenemos la precisión con el conjunto de test
+output = red_entrenada(test[1]')
+accuracy(test[2], Matrix(output'))
 
 ### IRIS
 
