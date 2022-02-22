@@ -202,27 +202,43 @@ end
 
 ##### entrenamiento
 
-function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}},
+# Función principal
+function entrenar(;topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}},
     maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)),
     test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)), maxEpochsVal::Int = 20)
 
     dataset = (Matrix(dataset[1]'),Matrix(dataset[2]')) # Trasponemos las matrices para que los patrones estén en columnas
     n_inputs = size(dataset[1])[1]
     n_outputs = size(dataset[2])[1]
-    red = rna(topology, n_inputs, n_outputs) # Creamos la red adecuada a la base de datos
-    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y); # Definimos la función loss en base a nuestra red (copiada del pdf)
-    losses = zeros(0) # Vamos a almacenar el loss de cada ciclo de entrenamiento en esta variable
-    for _ = 1:2000   # Número de ciclos de entrenamiento (lo puse aleatorio). Se regulará en la siguiente práctica
-        Flux.train!(loss, params(red), [dataset], ADAM(learningRate));  # Entrenamos la red con la función train! de la libreria FLux (copiado del pdf)
-
+    red = rna(topology, n_inputs, n_outputs)
+    loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y);
+    losses = zeros(0)
+    cnt = 0
+    best_loss = 100
+    best_red = 0
+    for i = 1:maxEpochs
+        Flux.train!(loss, params(red), [dataset], ADAM(learningRate))
         if validacion != tuple(zeros(0,0), falses(0,0))
-            print(loss(validacion[2], red(validacion)))
+            local_loss = loss(Matrix(validacion[1]'), Matrix(validacion[2]'))
+            if local_loss < best_loss
+                best_red = deepcopy(red)
+                best_loss = local_loss
+                cnt = 0
+            else
+                cnt += 1
+            end
+            push!(losses, local_loss)
+            if cnt == maxEpochsVal
+                return (best_red, losses)
+            end
+        else
+            push!(losses, loss(dataset[1],dataset[2]))
         end
-        append!(losses, loss(dataset[1],dataset[2])) # Añadimos el loss de cada ciclo
     end
-    return (red, losses) # Devolvemos la red entrenada y el vector de losses
+    return (red, losses)
 end
 
+# Función sobrecargada
 function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}}, maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01)
     target = reshape(dataset[2], (length(dataset[2]),1)) # Cambiamos el vector target a una matriz columna. No es necesario crear la columna contraria, porque cuando utilicemos la red entrenada, devolverá una matriz columna con valores entre 0 y 1, y a través del umbral ya decide si pertenece a la clase A o a la clase B
     inputs = dataset[1]                                  # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
@@ -233,6 +249,7 @@ end
 
 ##### sobreentrenamiento
 
+# Función para conjunto de entrenamiento y test
 function holdOut(N, P)
     d = randperm(N)
     test = d[1:Integer(round(P*N))]
@@ -240,9 +257,7 @@ function holdOut(N, P)
     return (entrenamiento, test)
 end
 
-
-#holdOut(150,0.3)
-
+# Función para conjunto de entrenamiento, validación y test
 function holdOut(N, Pval, Ptest)
     d, test = holdOut(N, Ptest)
     entrenamiento, validacion = holdOut(size(d)[1], Pval)
@@ -250,11 +265,6 @@ function holdOut(N, Pval, Ptest)
     validacion = d[validacion]
     return (entrenamiento, validacion, test)
 end
-
-#holdOut(20,0.3, 0.1)
-
-
-
 
 
 ##
@@ -319,6 +329,7 @@ accuracy(target, Matrix(output')) # Acuraccy nos devuelve el porcentaje de acier
 
 ### IRIS
 
+# Cargamos los datos
 dataset_iris = readdlm("iris.data",',');
 dataset_iris = permutedims(dataset_iris)
 feature_iris = dataset_iris[5,:]
@@ -327,18 +338,19 @@ target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
+# Dividimos los datos en tres conjuntos
 train_i, val_i, test_i = holdOut(size(input)[1], 0.1, 0.3)
-
 train = (input[train_i, 1:4], target[train_i, 1:3])
 val = (input[val_i, 1:4], target[val_i, 1:3])
 test = (input[test_i, 1:4], target[test_i, 1:3])
 
-train = (input, target)
+# Entrenamos la red con el conjunto de entrenamiento y validación
+red_entrenada,losses = entrenar(topology = [3], dataset = train, validacion = val)
 
-red_entrenada,losses = entrenar([3], dataset = train)
+# Obtenemos la precisión con el conjunto de test
+output = red_entrenada(test[1]')
+accuracy(test[2], Matrix(output'))
 
-output = red_entrenada(input')
-accuracy(target, Matrix(output'))
 
 ### IRIS (sin normalizar)
 
