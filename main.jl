@@ -7,6 +7,7 @@ using Statistics
 using DelimitedFiles
 using Flux
 using Random
+using Plots
 
 ############################## FUNCIONES ##############################
 
@@ -212,10 +213,21 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     n_outputs = size(dataset[2])[1]
     red = rna(topology, n_inputs, n_outputs)
     loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y);
-    losses = zeros(0)
+    losses_train = zeros(0)
+    losses_val = zeros(0)
+    losses_test = zeros(0)
     cnt = 0
     best_loss = 100
     best_red = 0
+    acc = 404
+
+    push!(losses_train, loss(dataset[1],dataset[2]))
+    if test != tuple(zeros(0,0), falses(0,0))
+        push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
+    end
+    if validacion != tuple(zeros(0,0), falses(0,0))
+        push!(losses_val,loss(Matrix(validacion[1]'), Matrix(validacion[2]')))
+    end
 
     for i = 1:maxEpochs
         Flux.train!(loss, params(red), [dataset], ADAM(learningRate))
@@ -228,15 +240,34 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
             else
                 cnt += 1
             end
-            push!(losses, local_loss)
+
+            push!(losses_train, loss(dataset[1],dataset[2]))
+            if test != tuple(zeros(0,0), falses(0,0))
+                push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
+            end
+            push!(losses_val, local_loss)
+
             if cnt == maxEpochsVal
-                return (best_red, losses)
+                if test != tuple(zeros(0,0), falses(0,0))
+                    output = best_red(test[1]')
+                    acc = accuracy(test[2], Matrix(output'))
+                end
+                return (best_red, (losses_train,losses_val,losses_test), acc)
             end
         else
-            push!(losses, loss(dataset[1],dataset[2]))
+            push!(losses_train, loss(dataset[1],dataset[2]))
+            if test != tuple(zeros(0,0), falses(0,0))
+                push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
+            end
         end
+
     end
-    return (red, losses)
+
+    if test != tuple(zeros(0,0), falses(0,0))
+        output = red(test[1]')
+        acc = accuracy(test[2], Matrix(output'))
+    end
+    return (best_red, (losses_train,losses_val,losses_test), acc)
 end
 
 
@@ -252,12 +283,18 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     else
         validacion = tuple(zeros(0,0), falses(0,0))
     end
+
+    if test != tuple(zeros(0,0), falses(0))
+        target_test = reshape(test[2], (length(test[2]),1))
+        inputs_test = test[1]
+        test = tuple(inputs_test, target_test)
+    else
+        test = tuple(zeros(0,0), falses(0,0))
+    end
+
     target = reshape(dataset[2], (length(dataset[2]),1))
-    target_test = reshape(test[2], (length(test[2]),1))
-    inputs = dataset[1]
-    inputs_test = test[1]                                # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
+    inputs = dataset[1]                               # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
     train = tuple(inputs, target)
-    test = tuple(inputs_test, target_test)
 
     return entrenar(topology, train, maxEpochs=maxEpochs, minLoss=minLoss, learningRate=learningRate,
                     test=test, validacion=validacion, maxEpochsVal=maxEpochsVal) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
@@ -287,69 +324,52 @@ end
 ##
 ############################### CÓDIGO ###############################
 
-##### oneHotEncoding
+##### HABERMAN
 
-### IRIS
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-classes_iris = unique(dataset_iris[5,:])
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1}, feature_iris)
-
-feature_iris_1 = oneHotEncoding(feature_iris, classes_iris)    # Función principal
-feature_iris_2 = oneHotEncoding(feature_iris)                  # Función sobrecargada 1
-
-### HABERMAN
 dataset_haber = readdlm("haberman.data",',');
-dataset_haber = dataset_haber'
-classes_haber = unique(dataset_haber[4,:])
-feature_haber = dataset_haber[4,:]
-feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
-
-feature_haber_1 = oneHotEncoding(feature_haber, classes_haber)  # Función principal
-feature_haber_2 = oneHotEncoding(feature_haber)                 # Función sobrecargada 1
-feature_haber_3 = oneHotEncoding(feature_haber_2)               # Función sobrecargada 2
-
-##### Máximos y mínimos
-numerics_haber=dataset_haber[1:3,:]'
-normalizeMinMax!(numerics_haber, calculateMinMaxNormalizationParameters(numerics_haber))    # Función sobrecargada 1
-normalizeMinMax!(numerics_haber)                                                            # Función sobrecargada 2
-normalizeMinMax(numerics_haber, calculateMinMaxNormalizationParameters(numerics_haber))     # Función sobrecargada 3
-normalizeMinMax(numerics_haber)                                                             # Función sobrecargada 4
-
-##### Media y desviación típica
-normalizeZeroMean!(numerics_haber,calculateZeroMeanNormalizationParameters(numerics_haber)) # Función sobrecargada 1
-normalizeZeroMean!(numerics_haber)                                                          # Función sobrecargada 2
-normalizeZeroMean(numerics_haber,calculateZeroMeanNormalizationParameters(numerics_haber))  # Función sobrecargada 3
-normalizeZeroMean(numerics_haber)                                                           # Función sobrecargada 4
-
-
-##### Entrenamiento de red
-
-### HABERMAN
-
-dataset_haber = readdlm("haberman.data",','); # Cargamos los datos
 dataset_haber = dataset_haber'
 feature_haber = dataset_haber[4,:]
 feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
 target = oneHotEncoding(feature_haber)
-numerics_haber = dataset_haber[1:3,:]'
-input = normalizeMinMax!(numerics_haber)
+
+input = dataset_haber[1:3,:]'
 
 # Dividimos los datos en tres conjuntos
-train_h, val_h, test_h = holdOut(size(input)[1], 0.1, 0.3)
-train = (input[train_h, 1:3], target[train_h])
-val = (input[val_h, 1:3], target[val_h])
-test = (input[test_h, 1:3], target[test_h])
+train_h, val_h, test_h = holdOut(size(input)[1], 0.3, 0.1)
 
-red_entrenada,losses = entrenar([3], train, validacion= val) # Entrenamos la red con 1 capa oculta de tres neuronas, durante 100 ciclos (nº arbitrario, se cambiará en la siguiente práctica)
-# Esto a simple vista devuelve la misma red, pero si le aplicamos la funcióin params(red) antes y despues del bucle de entrenamiento, observamos que los pesos cambian
+input_train = input[train_h, 1:3]
+maxmin_train = calculateMinMaxNormalizationParameters(input_train)
+input_train = normalizeMinMax(input_train, maxmin_train)
+train = (input_train, target[train_h])
 
-# Obtenemos la precisión con el conjunto de test
-output = red_entrenada(test[1]')
-accuracy(test[2], output[1,:])
+input_val = normalizeMinMax(input[val_h, 1:3], maxmin_train)
+val = (input_val, target[val_h])
 
-### IRIS
+input_test = normalizeMinMax(input[test_h, 1:3], maxmin_train)
+test = (input_test, target[test_h])
+
+red_entrenada,losses, acc = entrenar([3], train, validacion = val, test = test)
+
+g = plot()
+plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(g,1:length(losses[2]), losses[2], label = "validación")
+plot!(g,1:length(losses[3]), losses[3], label = "test")
+
+red_entrenada,losses, acc = entrenar([2,2], train,validacion = val, test = test)
+h = plot()
+plot!(h,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(h,1:length(losses[2]), losses[2], label = "validación")
+plot!(h,1:length(losses[3]), losses[3], label = "test")
+
+red_entrenada,losses, acc = entrenar([8], train,validacion = val, test = test)
+k = plot()
+plot!(k,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(k,1:length(losses[2]), losses[2], label = "validación")
+plot!(k,1:length(losses[3]), losses[3], label = "test")
+
+plot(g,h,k,layout = (3,1))
+
+##### IRIS
 
 # Cargamos los datos
 dataset_iris = readdlm("iris.data",',');
@@ -361,65 +381,28 @@ numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
 # Dividimos los datos en tres conjuntos
-train_i, val_i, test_i = holdOut(size(input)[1], 0.1, 0.3)
+train_i, val_i, test_i = holdOut(size(input)[1], 0.2, 0.1)
 train = (input[train_i, 1:4], target[train_i, 1:3])
 val = (input[val_i, 1:4], target[val_i, 1:3])
 test = (input[test_i, 1:4], target[test_i, 1:3])
 
 # Entrenamos la red con el conjunto de entrenamiento y validación
-red_entrenada,losses = entrenar([3], train, validacion = val)
+red_entrenada,losses, acc = entrenar([4], train,validacion = val, test = test)
+g = plot()
+plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(g,1:length(losses[2]), losses[2], label = "validación")
+plot!(g,1:length(losses[3]), losses[3], label = "test")
 
-# Obtenemos la precisión con el conjunto de test
-output = red_entrenada(test[1]')
-accuracy(test[2], Matrix(output'))
+red_entrenada,losses, acc = entrenar([4,4], train,validacion = val, test = test)
+h = plot()
+plot!(h,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(h,1:length(losses[2]), losses[2], label = "validación")
+plot!(h,1:length(losses[3]), losses[3], label = "test")
 
+red_entrenada,losses, acc = entrenar([8], train,validacion = val, test = test)
+k = plot()
+plot!(k,1:length(losses[1]), losses[1], label = "entrenamiento")
+plot!(k,1:length(losses[2]), losses[2], label = "validación")
+plot!(k,1:length(losses[3]), losses[3], label = "test")
 
-### IRIS (sin normalizar)
-
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
-target = oneHotEncoding(feature_iris)
-input = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-
-dataset = (input, target)
-red_entrenada,losses = entrenar([3], dataset)
-
-output = red_entrenada(input')
-accuracy(target, Matrix(output'))
-
-
-###################################################
-# Bucle para comprobar la mejor arquitectura
-#####################
-
-# Es un bucle que comprueba la mejor arquitectura para la red suponiendo el número de capas ocultas = 2
-# La que obtenga una mejor accuracy es la combinación óptima. En este caso probamos entre 1 y 4 neuronas por capa
-
-# Calculamos la media de 10 entrenamientos por arquitectura, pues no siempre obtemos la misma precisión
-
-"""
-let
-    best = 0
-    match = 0
-    for i = 1:4
-        for j = 1:4
-            x = zeros(0)
-            for _ = 1:10
-                dataset = (input, target)
-                red_entrenada,losses = entrenar([i,j], dataset)
-                output = red_entrenada(input')
-                append!(x, accuracy(target, Matrix(output')))
-            end
-            result = mean(x)
-            print(i, "\t", j, "\t", result, "\n")
-            if result > best
-                best = result
-                match = (i, j, best)
-            end
-        end
-    end
-    print("BEST: ", match[1], "\t", match[2], "\t", match[3])
-end
-"""
+plot(g,h,k,layout = (3,1))
