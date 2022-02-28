@@ -321,6 +321,57 @@ function holdOut(N, Pval, Ptest)
 end
 
 
+##### matriz de confusión
+
+# Funcion principal
+function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
+
+    VN = sum(outputs .== targets .== 0)
+    VP = sum(outputs .== targets .== 1)
+    FN = sum(outputs .== 0 .!= targets)
+    FP = sum(outputs .== 1 .!= targets)
+
+    acc = (VN + VP)/(VN + VP + FN + FP)
+    error_rate = (FN + FP)/(VN + VP + FN + FP)
+
+    if VN == length(outputs)
+        sensivity = 1
+        pos_pred_val = 1
+    else
+        sensivity = VP/(FN+VP)
+        pos_pred_val =  VP/(VP+FP)
+    end
+
+    if VP == length(outputs)
+        specificity = 1
+        neg_pred_val = 1
+    else
+        specificity = VN/(FP+VN)
+        neg_pred_val = VN/(VN+FN)
+    end
+
+    if pos_pred_val == sensivity == 0
+        f1_score = 0
+    else
+        f1_score = (2 * sensivity * pos_pred_val) / (sensivity + pos_pred_val)
+    end
+
+    conf_matrix = reshape([VN, FN, FP, VP], (2,2))
+
+    metrics = [acc, error_rate, sensivity, specificity, pos_pred_val, neg_pred_val, f1_score, conf_matrix]
+    replace!(metrics, NaN => 0)
+    return metrics
+end
+
+
+# Función sobrecargada
+function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}, threshold)
+    outputs = outputs .>= threshold
+    return confusionMatrix(outputs, targets)
+end
+
+
+
 ##
 ############################### CÓDIGO ###############################
 
@@ -335,7 +386,7 @@ target = oneHotEncoding(feature_haber)
 input = dataset_haber[1:3,:]'
 
 # Dividimos los datos en tres conjuntos
-train_h, val_h, test_h = holdOut(size(input)[1], 0.3, 0.1)
+train_h, val_h, test_h = holdOut(size(input)[1], 0.3, 0.2)
 
 input_train = input[train_h, 1:3]
 maxmin_train = calculateMinMaxNormalizationParameters(input_train)
@@ -368,6 +419,13 @@ plot!(k,1:length(losses[2]), losses[2], label = "validación")
 plot!(k,1:length(losses[3]), losses[3], label = "test")
 
 plot(g,h,k,layout = (3,1))
+
+
+# Matriz de confusión
+outputs = red_entrenada(test[1]')[1,:]
+targets = test[2]
+metrics = confusionMatrix(outputs, targets, 0.5)
+
 
 ##### IRIS
 
@@ -406,3 +464,39 @@ plot!(k,1:length(losses[2]), losses[2], label = "validación")
 plot!(k,1:length(losses[3]), losses[3], label = "test")
 
 plot(g,h,k,layout = (3,1))
+
+
+
+###################################################
+# Bucle para comprobar la mejor arquitectura
+#####################
+
+# Es un bucle que comprueba la mejor arquitectura para la red suponiendo el número de capas ocultas = 2
+# La que obtenga una mejor accuracy es la combinación óptima. En este caso probamos entre 1 y 4 neuronas por capa
+
+# Calculamos la media de 10 entrenamientos por arquitectura, pues no siempre obtemos la misma precisión
+
+"""
+let
+    best = 0
+    match = 0
+    for i = 1:4
+        for j = 1:4
+            x = zeros(0)
+            for _ = 1:10
+                dataset = (input, target)
+                red_entrenada,losses = entrenar([i,j], dataset)
+                output = red_entrenada(input')
+                append!(x, accuracy(target, Matrix(output')))
+            end
+            result = mean(x)
+            print(i, "\t", j, "\t", result, "\n")
+            if result > best
+                best = result
+                match = (i, j, best)
+            end
+        end
+    end
+    print("BEST: ", match[1], "\t", match[2], "\t", match[3])
+end
+"""
