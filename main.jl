@@ -267,7 +267,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
         output = red(test[1]')
         acc = accuracy(test[2], Matrix(output'))
     end
-    return (best_red, (losses_train,losses_val,losses_test), acc)
+    return (red, (losses_train,losses_val,losses_test), acc)
 end
 
 
@@ -399,7 +399,7 @@ val = (input_val, target[val_h])
 input_test = normalizeMinMax(input[test_h, 1:3], maxmin_train)
 test = (input_test, target[test_h])
 
-red_entrenada,losses, acc = entrenar([3], train, validacion = val, test = test)
+red_entrenada,losses, acc = entrenar([3], train, test = test)
 
 g = plot()
 plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento")
