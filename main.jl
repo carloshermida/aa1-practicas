@@ -252,7 +252,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
                     output = best_red(test[1]')
                     acc = accuracy(test[2], Matrix(output'))
                 end
-                return (best_red, (losses_train,losses_val,losses_test), acc)
+                return (best_red) #, (losses_train,losses_val,losses_test), acc)
             end
         else
             push!(losses_train, loss(dataset[1],dataset[2]))
@@ -267,7 +267,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
         output = red(test[1]')
         acc = accuracy(test[2], Matrix(output'))
     end
-    return (red, (losses_train,losses_val,losses_test), acc)
+    return (red)    #, (losses_train,losses_val,losses_test), acc)
 end
 
 
@@ -500,3 +500,24 @@ let
     print("BEST: ", match[1], "\t", match[2], "\t", match[3])
 end
 """
+
+dataset_iris = readdlm("iris.data",',');
+dataset_iris = permutedims(dataset_iris)
+feature_iris = dataset_iris[5,:]
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+target = oneHotEncoding(feature_iris)
+numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
+input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
+# Uno contra todos
+numClasses = length(unique(feature_iris))
+numInstances = size(dataset_iris)[2]
+outputs = Array{Float32,2}(undef, numInstances, numClasses);
+
+data = tuple(input, target)
+for numClass in 1:numClasses
+
+
+    data1 = tuple(input, target[:,2])#[numClass]])
+    model = entrenar([4], data1);
+    outputs[:,numClass] .= model[1](input);
+end;
