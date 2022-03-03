@@ -252,7 +252,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
                     output = best_red(test[1]')
                     acc = accuracy(test[2], Matrix(output'))
                 end
-                return (best_red) #, (losses_train,losses_val,losses_test), acc)
+                return (best_red, (losses_train,losses_val,losses_test), acc)
             end
         else
             push!(losses_train, loss(dataset[1],dataset[2]))
@@ -267,7 +267,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
         output = red(test[1]')
         acc = accuracy(test[2], Matrix(output'))
     end
-    return (red)    #, (losses_train,losses_val,losses_test), acc)
+    return (red, (losses_train,losses_val,losses_test), acc)
 end
 
 
@@ -335,30 +335,30 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
     error_rate = (FN + FP)/(VN + VP + FN + FP)
 
     if VN == length(outputs)
-        sensivity = 1
-        pos_pred_val = 1
+        sensitivity = 1
+        VPP = 1
     else
-        sensivity = VP/(FN+VP)
-        pos_pred_val =  VP/(VP+FP)
+        sensitivity = VP/(FN+VP)
+        VPP =  VP/(VP+FP)
     end
 
     if VP == length(outputs)
         specificity = 1
-        neg_pred_val = 1
+        VPN = 1
     else
         specificity = VN/(FP+VN)
-        neg_pred_val = VN/(VN+FN)
+        VPN = VN/(VN+FN)
     end
 
-    if pos_pred_val == sensivity == 0
+    if VPP == sensitivity == 0
         f1_score = 0
     else
-        f1_score = (2 * sensivity * pos_pred_val) / (sensivity + pos_pred_val)
+        f1_score = (2 * sensitivity * VPP) / (sensitivity + VPP)
     end
 
     conf_matrix = reshape([VN, FN, FP, VP], (2,2))
 
-    metrics = [acc, error_rate, sensivity, specificity, pos_pred_val, neg_pred_val, f1_score, conf_matrix]
+    metrics = [acc, error_rate, sensitivity, specificity, VPP, VPN, f1_score, conf_matrix]
     replace!(metrics, NaN => 0)
     return metrics
 end
@@ -371,6 +371,30 @@ function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArra
 end
 
 
+function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro") # hay que contemplar el caso en el que los datasets no sean del mismo tamaño? sin querer
+    if size(outputs)[2] == size(targets)[2] >= 2
+        sensitivity = zeros(0)
+        specificity = zeros(0)
+        VPP = zeros(0)
+        VPN = zeros(0)
+        f1_score = zeros(0)
+
+        numClasses = size(outputs)[2]
+        for numClass in 1:numClasses
+            sensitivity, specificity, VPP, VPN, f1_score = confusionMatrix(outputs[:,numClass], targets[:,numClass])[3:7]
+
+        end
+
+
+
+
+    else
+        outputs, targets = outputs[:,1], targets[:,1]
+        confusionMatrix(outputs, targets)
+end
+
+
+confusionMatrix(outputs, target, "macro")
 
 ##
 ############################### CÓDIGO ###############################
@@ -465,8 +489,6 @@ plot!(k,1:length(losses[3]), losses[3], label = "test")
 
 plot(g,h,k,layout = (3,1))
 
-
-
 ###################################################
 # Bucle para comprobar la mejor arquitectura
 #####################
@@ -508,16 +530,21 @@ feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
 target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
+
 # Uno contra todos
 numClasses = length(unique(feature_iris))
 numInstances = size(dataset_iris)[2]
 outputs = Array{Float32,2}(undef, numInstances, numClasses);
 
-data = tuple(input, target)
+
 for numClass in 1:numClasses
 
+    data1 = tuple(input, target[:,[numClass]])
+    model = entrenar([4], data1)[1];
+    outputs[:,numClass] = model(input');
 
-    data1 = tuple(input, target[:,2])#[numClass]])
-    model = entrenar([4], data1);
-    outputs[:,numClass] .= model[1](input);
-end;
+end
+
+outputs = softmax(outputs')'
+vmax = maximum(outputs, dims=2)
+outputs = (outputs .== vmax)
