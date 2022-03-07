@@ -208,7 +208,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)),
     test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)), maxEpochsVal::Int = 20)
 
-    dataset = (Matrix(dataset[1]'),Matrix(dataset[2]')) # Trasponemos las matrices para que los patrones estén en columnas
+    dataset = (Matrix(dataset[1]'),Matrix(dataset[2]'))
     n_inputs = size(dataset[1])[1]
     n_outputs = size(dataset[2])[1]
     red = rna(topology, n_inputs, n_outputs)
@@ -293,11 +293,11 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     end
 
     target = reshape(dataset[2], (length(dataset[2]),1))
-    inputs = dataset[1]                               # Si tiene dos clases, solo hace falta una neurona de salida, pero si tiene más, harán falta tantas neuronas de salidas como clases.
+    inputs = dataset[1]
     train = tuple(inputs, target)
 
     return entrenar(topology, train, maxEpochs=maxEpochs, minLoss=minLoss, learningRate=learningRate,
-                    test=test, validacion=validacion, maxEpochsVal=maxEpochsVal) # Ahora ya le pasamos 2 matrices, por lo que va a la función anterior
+                    test=test, validacion=validacion, maxEpochsVal=maxEpochsVal)
 end
 
 
@@ -363,14 +363,13 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
     return metrics
 end
 
-
-# Función sobrecargada
+# Función sobrecargada 1
 function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}, threshold)
     outputs = outputs .>= threshold
     return confusionMatrix(outputs, targets)
 end
 
-
+# Función sobrecargada 2
 function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro") # hay que contemplar el caso en el que los datasets no sean del mismo tamaño? sin querer
     if size(outputs)[2] == size(targets)[2] > 2
         sensitivity = zeros(0)
@@ -379,7 +378,6 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
         VPN = zeros(0)
         f1_score = zeros(0)
         names_metrics = [sensitivity, specificity, VPP, VPN, f1_score]
-
         numClasses = size(outputs)[2]
         conf_matrix = zeros(numClasses,numClasses)
 
@@ -399,7 +397,6 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
     end
 
     means_metrics = zeros(0)
-
     if combination == "macro"
         for i in names_metrics
             append!(means_metrics, mean(i))
@@ -418,12 +415,22 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
     return (conf_matrix, names_metrics, means_metrics, accuracy(targets, outputs), 1-accuracy(targets, outputs))
 end
 
-
+# Función sobrecargada 3
 function confusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}, combination = "macro")
     return confusionMatrix(classifyOutputs(outputs), targets, combination)
 end
 
-# comprobar
+# Función sobrecargada 4
+function confusionMatrix(outputs::AbstractArray{<:Any}, targets::AbstractArray{<:Any}, combination = "macro")
+    if size(outputs)[1] == size(targets)[1]
+        #@assert(all([in(output, unique(targets)) for output in outputs]))
+        targets_classes = unique(targets)
+        outputs = classifyOutputs(outputs)
+        targets = oneHotEncoding(targets, targets_classes)
+        return confusionMatrix(outputs, targets, combination)
+    end
+end
+
 
 ##
 ############################### CÓDIGO ###############################
@@ -473,7 +480,6 @@ plot!(k,1:length(losses[3]), losses[3], label = "test")
 
 plot(g,h,k,layout = (3,1))
 
-
 # Matriz de confusión
 outputs = red_entrenada(test[1]')[1,:]
 targets = test[2]
@@ -518,39 +524,8 @@ plot!(k,1:length(losses[3]), losses[3], label = "test")
 
 plot(g,h,k,layout = (3,1))
 
-###################################################
-# Bucle para comprobar la mejor arquitectura
-#####################
 
-# Es un bucle que comprueba la mejor arquitectura para la red suponiendo el número de capas ocultas = 2
-# La que obtenga una mejor accuracy es la combinación óptima. En este caso probamos entre 1 y 4 neuronas por capa
-
-# Calculamos la media de 10 entrenamientos por arquitectura, pues no siempre obtemos la misma precisión
-
-"""
-let
-    best = 0
-    match = 0
-    for i = 1:4
-        for j = 1:4
-            x = zeros(0)
-            for _ = 1:10
-                dataset = (input, target)
-                red_entrenada,losses = entrenar([i,j], dataset)
-                output = red_entrenada(input')
-                append!(x, accuracy(target, Matrix(output')))
-            end
-            result = mean(x)
-            print(i, "\t", j, "\t", result, "\n")
-            if result > best
-                best = result
-                match = (i, j, best)
-            end
-        end
-    end
-    print("BEST: ", match[1], "\t", match[2], "\t", match[3])
-end
-"""
+##### IRIS
 
 dataset_iris = readdlm("iris.data",',');
 dataset_iris = permutedims(dataset_iris)
@@ -565,9 +540,7 @@ numClasses = length(unique(feature_iris))
 numInstances = size(dataset_iris)[2]
 outputs = Array{Float32,2}(undef, numInstances, numClasses);
 
-
 for numClass in 1:numClasses
-
     data1 = tuple(input, target[:,[numClass]])
     model = entrenar([4], data1)[1];
     outputs[:,numClass] = model(input');
