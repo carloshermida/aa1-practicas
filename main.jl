@@ -378,44 +378,52 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
         VPP = zeros(0)
         VPN = zeros(0)
         f1_score = zeros(0)
-        list_conf_matrix = Vector{Matrix{Float64}}()
         names_metrics = [sensitivity, specificity, VPP, VPN, f1_score]
 
         numClasses = size(outputs)[2]
-        for numClass in 1:numClasses
-            conf_matrix = zeros(2,2)
-            for i in 1:5
-                append!(names_metrics[i], confusionMatrix(outputs[:,numClass], targets[:,numClass])[i+2])
+        conf_matrix = zeros(numClasses,numClasses)
 
+        for numClass in 1:numClasses
+            for numClass2 in 1:numClasses
+                conf_matrix[numClass, numClass2] = sum(outputs[:,numClass2] .== targets[:,numClass] .== 1)
             end
 
-            conf_matrix = confusionMatrix(outputs[:,numClass], targets[:,numClass])[8]
-            print(conf_matrix)
-            push!(list_conf_matrix, conf_matrix)
-
+            for i in 1:5
+                append!(names_metrics[i], confusionMatrix(outputs[:,numClass], targets[:,numClass])[i+2])
+            end
         end
 
     else
         outputs, targets = outputs[:,1], targets[:,1]
         confusionMatrix(outputs, targets)
-
     end
 
     means_metrics = zeros(0)
+
     if combination == "macro"
         for i in names_metrics
             append!(means_metrics, mean(i))
         end
 
     elseif combination == "weighted"
-
+        weights = zeros(0)
+        for numClass in 1:numClasses
+            append!(weights, sum(targets[:,numClass])/size(targets)[1])
+        end
+        for i in names_metrics
+            append!(means_metrics ,sum(i .* weights))
+        end
     end
 
-    return (list_conf_matrix, names_metrics, means_metrics)
+    return (conf_matrix, names_metrics, means_metrics, accuracy(targets, outputs), 1-accuracy(targets, outputs))
 end
 
 
-confusionMatrix(outputs, target, "macro", )
+function confusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}, combination = "macro")
+    return confusionMatrix(classifyOutputs(outputs), targets, combination)
+end
+
+# comprobar
 
 ##
 ############################### CÓDIGO ###############################
@@ -569,3 +577,5 @@ end
 outputs = softmax(outputs')'
 vmax = maximum(outputs, dims=2)
 outputs = (outputs .== vmax)
+
+confusionMatrix(outputs, target, "weighted")
