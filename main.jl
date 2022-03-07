@@ -401,17 +401,21 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
 
     end
 
+    means_metrics = zeros(0)
     if combination == "macro"
-        
+        for i in names_metrics
+            append!(means_metrics, mean(i))
+        end
+
     elseif combination == "weighted"
 
     end
 
-    return (list_conf_matrix, names_metrics)
+    return (list_conf_matrix, names_metrics, means_metrics)
 end
 
 
-confusionMatrix(outputs, target, "macro")
+confusionMatrix(outputs, target, "macro", )
 
 ##
 ############################### CÓDIGO ###############################
