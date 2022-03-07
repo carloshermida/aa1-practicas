@@ -372,25 +372,42 @@ end
 
 
 function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro") # hay que contemplar el caso en el que los datasets no sean del mismo tamaño? sin querer
-    if size(outputs)[2] == size(targets)[2] >= 2
+    if size(outputs)[2] == size(targets)[2] > 2
         sensitivity = zeros(0)
         specificity = zeros(0)
         VPP = zeros(0)
         VPN = zeros(0)
         f1_score = zeros(0)
+        list_conf_matrix = Vector{Matrix{Float64}}()
+        names_metrics = [sensitivity, specificity, VPP, VPN, f1_score]
 
         numClasses = size(outputs)[2]
         for numClass in 1:numClasses
-            sensitivity, specificity, VPP, VPN, f1_score = confusionMatrix(outputs[:,numClass], targets[:,numClass])[3:7]
+            conf_matrix = zeros(2,2)
+            for i in 1:5
+                append!(names_metrics[i], confusionMatrix(outputs[:,numClass], targets[:,numClass])[i+2])
+
+            end
+
+            conf_matrix = confusionMatrix(outputs[:,numClass], targets[:,numClass])[8]
+            print(conf_matrix)
+            push!(list_conf_matrix, conf_matrix)
 
         end
-
-
-
 
     else
         outputs, targets = outputs[:,1], targets[:,1]
         confusionMatrix(outputs, targets)
+
+    end
+
+    if combination == "macro"
+        
+    elseif combination == "weighted"
+
+    end
+
+    return (list_conf_matrix, names_metrics)
 end
 
 
