@@ -431,6 +431,35 @@ function confusionMatrix(outputs::AbstractArray{<:Any}, targets::AbstractArray{<
     end
 end
 
+function crossvalidation(N::Int, k::Int)
+    subset_index=collect(1:k)
+    rep_subset=repeat(subset_index, Integer(ceil(N/k)))
+    rep_subset=rep_subset[1:N]
+    return shuffle!(rep_subset)
+end
+
+function crossvalidation(targets::AbstractArray{Bool,2}, k)
+    subset_index=collect(1:size(targets)[1])
+    for class in 1:size(targets)[2]
+        class_elements = sum(targets[:,class])
+        if class_elements>=k
+            estratos=crossvalidation(class_elements, k)
+            cnt=1
+            for i in 1:size(targets)[1]
+                if targets[i,class]==1
+                    subset_index[i]=estratos[cnt]
+                    cnt+=1
+                end
+            end
+        end
+    end
+    return subset_index
+end
+
+function crossvalidation(targets::AbstractArray{<:Any,1}, k)  #########preguntar
+    targets=oneHotEncoding(targets)
+    return crossvalidation(targets, k)
+end
 
 ##
 ############################### CÓDIGO ###############################
@@ -552,3 +581,18 @@ vmax = maximum(outputs, dims=2)
 outputs = (outputs .== vmax)
 
 confusionMatrix(outputs, target, "weighted")
+
+# comprobacion practica 5 con iris
+Random.seed!(123)
+dataset_iris = readdlm("iris.data",',');
+dataset_iris = permutedims(dataset_iris)
+feature_iris = dataset_iris[5,:]
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+target = oneHotEncoding(feature_iris)
+k=10
+subset_index=crossvalidation(target, 10)
+
+crossvalidation_test=zeros(0)
+
+for n in 1:k
+end
