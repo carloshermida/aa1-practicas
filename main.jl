@@ -370,7 +370,7 @@ function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArra
 end
 
 # Función sobrecargada 2
-function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro") # hay que contemplar el caso en el que los datasets no sean del mismo tamaño? sin querer
+function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro")
     if size(outputs)[2] == size(targets)[2] > 2
         sensitivity = zeros(0)
         specificity = zeros(0)
@@ -431,6 +431,10 @@ function confusionMatrix(outputs::AbstractArray{<:Any}, targets::AbstractArray{<
     end
 end
 
+
+##### Validación cruzada
+
+# Función auxiliar
 function crossvalidation(N::Int, k::Int)
     subset_index=collect(1:k)
     rep_subset=repeat(subset_index, Integer(ceil(N/k)))
@@ -438,6 +442,7 @@ function crossvalidation(N::Int, k::Int)
     return shuffle!(rep_subset)
 end
 
+# Función principal
 function crossvalidation(targets::AbstractArray{Bool,2}, k)
     subset_index=collect(1:size(targets)[1])
     for class in 1:size(targets)[2]
@@ -456,20 +461,22 @@ function crossvalidation(targets::AbstractArray{Bool,2}, k)
     return subset_index
 end
 
-function crossvalidation(targets::AbstractArray{<:Any,1}, k)  #########preguntar
+# Función sobrecargada
+function crossvalidation(targets::AbstractArray{<:Any,1}, k)
     targets=oneHotEncoding(targets)
     return crossvalidation(targets, k)
 end
 
+
 ##
 ############################### CÓDIGO ###############################
 
-##### HABERMAN
+##### HABERMAN (Hold Out y Plot)
 
-dataset_haber = readdlm("haberman.data",',');
+dataset_haber = readdlm("haberman.data",',')
 dataset_haber = dataset_haber'
 feature_haber = dataset_haber[4,:]
-feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
+feature_haber = convert(AbstractArray{<:Any,1},feature_haber)
 target = oneHotEncoding(feature_haber)
 
 input = dataset_haber[1:3,:]'
@@ -515,7 +522,7 @@ targets = test[2]
 metrics = confusionMatrix(outputs, targets, 0.5)
 
 
-##### IRIS
+##### IRIS (Hold Out y Plot)
 
 # Cargamos los datos
 dataset_iris = readdlm("iris.data",',');
@@ -554,26 +561,26 @@ plot!(k,1:length(losses[3]), losses[3], label = "test")
 plot(g,h,k,layout = (3,1))
 
 
-##### IRIS
+##### IRIS (Uno contra todos)
 
-dataset_iris = readdlm("iris.data",',');
+# Cargamos los datos
+dataset_iris = readdlm("iris.data",',')
 dataset_iris = permutedims(dataset_iris)
 feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
+feature_iris = convert(AbstractArray{<:Any,1},feature_iris)
 target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
-# Uno contra todos
+# Entrenamos para cada clase
 numClasses = length(unique(feature_iris))
 numInstances = size(dataset_iris)[2]
-outputs = Array{Float32,2}(undef, numInstances, numClasses);
+outputs = Array{Float32,2}(undef, numInstances, numClasses)
 
 for numClass in 1:numClasses
     data1 = tuple(input, target[:,[numClass]])
-    model = entrenar([4], data1)[1];
-    outputs[:,numClass] = model(input');
-
+    model = entrenar([4], data1)[1]
+    outputs[:,numClass] = model(input')
 end
 
 outputs = softmax(outputs')'
@@ -581,8 +588,11 @@ vmax = maximum(outputs, dims=2)
 outputs = (outputs .== vmax)
 
 confusionMatrix(outputs, target, "weighted")
+confusionMatrix(outputs, target, "macro")
 
-# comprobacion practica 5 con iris
+##### IRIS (Validación cruzada)
+
+# Obtenemos los datos
 Random.seed!(123)
 dataset_iris = readdlm("iris.data",',');
 dataset_iris = permutedims(dataset_iris)
@@ -592,31 +602,50 @@ target = oneHotEncoding(feature_iris)
 numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
 input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
 
+# División en 10 grupos
 k=10
 subset_index=crossvalidation(target, 10)
 numerics_iris=hcat(numerics_iris,subset_index)
+crossvalidation_test=Array{Any,1}(undef,k)
 
-crossvalidation_test=Array{Any,1}(undef,k);
-
+# Entrenamos 20 veces para cada grupo y sacamos la media
 for n in 1:k
-    train_rows=numerics_iris[:,5].!=n
-    train=input[train_rows,1:4]
+    train_val_rows=numerics_iris[:,5].!=n
+    train_val=input[train_val_rows,1:4]
+    train_val_targets=target[train_val_rows,:]
+
+    train_index, val_index = holdOut(size(train_val)[1], 0.4)
+    val = train_val[val_index, 1:4]
+    train = train_val[train_index, 1:4]
+
+    val_targets = train_val_targets[val_index,:]
+    train_targets = train_val_targets[train_index,:]
+
     test_rows=numerics_iris[:,5].==n
     test=input[test_rows,1:4]
-    train_targets=target[train_rows,:]
     test_targets=target[test_rows,:]
 
-    dataset=(train,train_targets)
-    dataset_test=(test, test_targets)
+    dataset = (train,train_targets)
+    dataset_test = (test, test_targets)
+    dataset_val = (val, val_targets)
 
     redes_losses=Array{Any,1}(undef,20);
     redes_acc=Array{Any,1}(undef,20);
     for i in 1:20
-        red_entrenada,losses, acc = entrenar([4], dataset, test = dataset_test)
-        redes_losses[i]=losses
+        red_entrenada,losses, acc = entrenar([4], dataset, test = dataset_test, validacion = dataset_val)
+        redes_losses[i]=last(losses[3])
         redes_acc[i]=acc
     end
-
     crossvalidation_test[n]=(mean(redes_losses), mean(redes_acc))
 
 end
+
+# Cálculo de media y desviación típica
+kfold_losses = zeros(0)
+kfold_acc = zeros(0)
+foreach(x->(append!(kfold_losses,x[1]),append!(kfold_acc,x[2])), crossvalidation_test)
+
+mean_kfold_losses = mean(kfold_losses)
+sd_kfold_losses = std(kfold_losses)
+mean_kfold_acc = mean(kfold_acc)
+sd_kfold_acc = std(kfold_acc)
