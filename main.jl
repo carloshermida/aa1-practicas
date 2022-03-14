@@ -1,5 +1,5 @@
 
-#               PRÁCTICA APRENDIZAJE AUTOMÁTICO I / v1.3
+#               PRÁCTICA APRENDIZAJE AUTOMÁTICO I / v1.5
 #         Nina López | Borja Souto | Carmen Lozano | Carlos Hermida
 
 
@@ -589,10 +589,34 @@ dataset_iris = permutedims(dataset_iris)
 feature_iris = dataset_iris[5,:]
 feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
 target = oneHotEncoding(feature_iris)
+numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
+input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
+
 k=10
 subset_index=crossvalidation(target, 10)
+numerics_iris=hcat(numerics_iris,subset_index)
 
-crossvalidation_test=zeros(0)
+crossvalidation_test=Array{Any,1}(undef,k);
 
 for n in 1:k
+    train_rows=numerics_iris[:,5].!=n
+    train=input[train_rows,1:4]
+    test_rows=numerics_iris[:,5].==n
+    test=input[test_rows,1:4]
+    train_targets=target[train_rows,:]
+    test_targets=target[test_rows,:]
+
+    dataset=(train,train_targets)
+    dataset_test=(test, test_targets)
+
+    redes_losses=Array{Any,1}(undef,20);
+    redes_acc=Array{Any,1}(undef,20);
+    for i in 1:20
+        red_entrenada,losses, acc = entrenar([4], dataset, test = dataset_test)
+        redes_losses[i]=losses
+        redes_acc[i]=acc
+    end
+
+    crossvalidation_test[n]=(mean(redes_losses), mean(redes_acc))
+
 end
