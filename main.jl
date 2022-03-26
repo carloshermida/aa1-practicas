@@ -1,5 +1,5 @@
 
-#               PRÁCTICA APRENDIZAJE AUTOMÁTICO I / v1.5
+#                  PRÁCTICA 1 APRENDIZAJE AUTOMÁTICO I
 #         Nina López | Borja Souto | Carmen Lozano | Carlos Hermida
 
 
@@ -8,6 +8,10 @@ using DelimitedFiles
 using Flux
 using Random
 using Plots
+using ScikitLearn
+@sk_import svm: SVC
+@sk_import tree: DecisionTreeClassifier
+@sk_import neighbors: KNeighborsClassifier
 
 ####################################### FUNCIONES ##############################################
 # ----------------------------------------------------------------------------------------------
@@ -196,7 +200,6 @@ end;
 # Añado estas funciones porque las RR.NN.AA. dan la salida como matrices de valores Float32 en lugar de Float64
 # Con estas funciones se pueden usar indistintamente matrices de Float32 o Float64
 accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{Float32,1}, threshold::Float64=0.5) = accuracy(targets, Float64.(outputs), threshold);
-accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{Float32,2})  = accuracy(targets, Float64.(outputs));
 
 # Funciones para crear y entrenar una RNA
 # red neuronal artificial
@@ -319,7 +322,7 @@ end
 
 # sobreentrenamiento
 # Función para conjunto de entrenamiento y test
-function holdOut(N::int, P::Float64)
+function holdOut(N::Int, P::Float64)
     d = randperm(N)
     test = d[1:Integer(round(P*N))]
     entrenamiento = d[Integer(round(P*N))+1:end]
@@ -335,11 +338,11 @@ function holdOut(N, Pval, Ptest)
     return (entrenamiento, validacion, test)
 end;
 
-# A PRIORI
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 4 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
 
-
-##### matriz de confusión
-
+# Matriz de confusión
 # Funcion principal
 function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
 
@@ -381,7 +384,7 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
 end
 
 # Función sobrecargada 1
-function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}, threshold)
+function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}, threshold=0.5)
     outputs = outputs .>= threshold
     return confusionMatrix(outputs, targets)
 end
@@ -448,6 +451,11 @@ function confusionMatrix(outputs::AbstractArray{<:Any}, targets::AbstractArray{<
     end
 end
 
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 5 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
+
+# Estrategia "uno contra todos"
 function crossvalidation(N::Int, k::Int)
     subset_index=collect(1:k)
     rep_subset=repeat(subset_index, Integer(ceil(N/k)))
@@ -473,16 +481,88 @@ function crossvalidation(targets::AbstractArray{Bool,2}, k)
     return subset_index
 end
 
-function crossvalidation(targets::AbstractArray{<:Any,1}, k)  #########preguntar
+function crossvalidation(targets::AbstractArray{<:Any,1}, k)
     targets=oneHotEncoding(targets)
     return crossvalidation(targets, k)
 end
+
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 6 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
+
+function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Any,1}, k::Int)
+    @assert(size(inputs,1)==length(targets));
+    classes = unique(targets);
+    if modelType==:ANN
+        targets = oneHotEncoding(targets, classes);
+    end;
+
+    crossValidationIndices = crossvalidation(size(inputs,1), k);
+    testAcc = Array{Float64,1}(undef, k);
+    testF1 = Array{Float64,1}(undef, k);
+
+    for fold in 1:k
+        if (modelType==:SVM) || (modelType==:DecisionTree) || (modelType==:kNN)
+            trainInputs = inputs[crossValidationIndices.!=fold,:];
+            testInputs = inputs[crossValidationIndices.==fold,:];
+            trainTargets = targets[crossValidationIndices.!=fold];
+            testTargets = targets[crossValidationIndices.==fold];
+
+            if modelType==:SVM
+                model = SVC(kernel=parameters["kernel"], degree=parameters["kernelDegree"], gamma=parameters["kernelGamma"], C=parameters["C"]);
+            elseif modelType==:DecisionTree
+                model = DecisionTreeClassifier(max_depth=parameters["maxDepth"], random_state=1);
+            elseif modelType==:kNN
+                model = KNeighborsClassifier(parameters["numNeighbors"]);
+            end;
+
+            model = fit!(model, trainInputs, trainTargets);
+            testOutputs = predict(model, testInputs);
+            (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
+        else
+            @assert(modelType==:ANN);
+            trainInputs = inputs[crossValidationIndices.!=fold,:];
+            testInputs = inputs[crossValidationIndices.==fold,:];
+            trainTargets = targets[crossValidationIndices.!=fold,:];
+            testTargets = targets[crossValidationIndices.==fold,:];
+
+            testAccRep = Array{Float64,1}(undef, parameters["numExecutions"]);
+            testF1Rep = Array{Float64,1}(undef, parameters["numExecutions"]);
+
+            for numTrain in 1:parameters["numExecutions"]
+                if parameters["validationRatio"]>0
+                    (trainIndices, validationIndices) = holdOut(size(trainInputs,1), parameters["validationRatio"]*size(trainInputs,1)/size(inputs,1));
+                    ann, = entrenar(parameters["topology"],
+                        trainInputs[trainIndices,:],   trainTargets[trainIndices,:], maxEpochs = parameters["maxEpochs"],
+                        minLoss = 0, learningRate = parameters["learningRate"],
+                        validacion=tuple(trainInputs[validationIndices,:], trainTargets[validationIndices,:]),
+                        test=tuple(testInputs, testTargets);
+                        maxEpochsVal = parameters["maxEpochsVal"]);
+                else
+                    ann, = entrenar(parameters["topology"],
+                        trainInputs, trainTargets, maxEpochs = parameters["maxEpochs"], minLoss = 0,
+                        learningRate = parameters["learningRate"], validacion=tuple(zeros(0,0), falses(0,0)),
+                        test=tuple(testInputs, testTargets));
+                end;
+                (testAccRep[numTrain], _, _, _, _, _, testF1Rep[numTrain], _) = confusionMatrix(collect(ann(testInputs')'), testTargets);
+            end;
+            acc = mean(testAccRep);
+            F1  = mean(testF1Rep);
+        end;
+        testAcc[fold] = acc;
+        testF1[fold] = F1;
+        println("Results in test in fold ", fold, "/", k, ": accuracy: ", 100*testAcc[fold], " %, F1: ", 100*testF1[fold], " %");
+    end;
+    println(modelType, ": Average test accuracy on a ", k, "-fold crossvalidation: ", 100*mean(testAcc), ", with a standard deviation of ", 100*std(testAcc));
+    println(modelType, ": Average test F1 on a ", k, "-fold crossvalidation: ", 100*mean(testF1), ", with a standard deviation of ", 100*std(testF1));
+    return (mean(testAcc), std(testAcc), mean(testF1), std(testF1));
+end;
 
 ##
 ############################### CÓDIGO ###############################
 
 ##### HABERMAN
-
+"""
 dataset_haber = readdlm("haberman.data",',');
 dataset_haber = dataset_haber'
 feature_haber = dataset_haber[4,:]
@@ -637,3 +717,63 @@ for n in 1:k
     crossvalidation_test[n]=(mean(redes_losses), mean(redes_acc))
 
 end
+"""
+Random.seed!(1);
+
+k = 10;
+
+# Parametros principales de la RNA y del proceso de entrenamiento
+topology = [4, 3]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
+learningRate = 0.01; # Tasa de aprendizaje
+numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
+validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
+maxEpochsVal = 6; # Numero de ciclos en los que si no se mejora el loss en el conjunto de validacion, se para el entrenamiento
+numRepetitionsAANTraining = 50; # Numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento
+
+# Parametros del SVM
+kernel = "rbf";
+kernelDegree = 3;
+kernelGamma = 2;
+C=1;
+
+# Parametros del arbol de decision
+maxDepth = 4;
+
+# Parapetros de kNN
+numNeighbors = 3;
+
+# Cargamos el dataset
+dataset = readdlm("iris.data",',');
+# Preparamos las entradas y las salidas deseadas
+inputs = convert(Array{Float64,2}, dataset[:,1:4]);
+inputs = inputs'
+targets = dataset[:,5];
+####################################################################################################################################
+targets = reshape(targets, (1, 150))
+
+# Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
+normalizeMinMax!(inputs);
+
+# Entrenamos las RR.NN.AA.
+parameters = Dict();
+parameters["topology"] = topology;
+parameters["learningRate"] = learningRate;
+parameters["validationRatio"] = validationRatio;
+parameters["numExecutions"] = numRepetitionsAANTraining;
+parameters["maxEpochs"] = numMaxEpochs;
+parameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, parameters, inputs, targets, k);
+
+# Entrenamos las SVM
+modelHyperparameters = Dict();
+modelHyperparameters["kernel"] = kernel;
+modelHyperparameters["kernelDegree"] = kernelDegree;
+modelHyperparameters["kernelGamma"] = kernelGamma;
+modelHyperparameters["C"] = C;
+modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, numFolds);
+
+# Entrenamos los arboles de decision
+modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, numFolds);
+
+# Entrenamos los kNN
+modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, numFolds);
