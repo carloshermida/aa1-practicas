@@ -9,11 +9,12 @@ using Flux
 using Random
 using Plots
 
-############################## FUNCIONES ##############################
+####################################### FUNCIONES ##############################################
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 1 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
 
-##### oneHotEncoding
-
-# Función principal
+# Funcion para realizar la codificacion, recibe el vector de caracteristicas (uno por patron), y las clases
 function oneHotEncoding(feature::AbstractArray{<:Any,1}, classes)
     if length(classes) == 2
         feature=feature.==classes[1]
@@ -26,30 +27,39 @@ function oneHotEncoding(feature::AbstractArray{<:Any,1}, classes)
         end
     return bool_matrix;
     end
-end
+end;
 
 # Función sobrecargada 1
-oneHotEncoding(feature::AbstractArray{<:Any,1})=(classes=unique(feature);oneHotEncoding(feature, classes))
+# Esta funcion es similar a la anterior, pero si no es especifican las clases, se toman de la propia variable
+oneHotEncoding(feature::AbstractArray{<:Any,1})=oneHotEncoding(feature::AbstractArray{Any,1}, unique(feature));
 
 # Función sobrecargada 2
-function oneHotEncoding(feature::AbstractArray{Bool,1})
-    classes=unique(feature)
-    if length(classes) == 2
-        feature=feature.==classes[1]
-        reshape(feature, (length(feature),1))
-        return feature;
-    end
-end
+# Sobrecargamos la funcion oneHotEncoding por si acaso pasan un vector de valores booleanos
+#  En este caso, el propio vector ya está codificado
+oneHotEncoding(feature::AbstractArray{Bool,1}) = feature;
+# Cuando se llame a la funcion oneHotEncoding, según el tipo del argumento pasado, Julia realizará
+#  la llamada a la función correspondiente
 
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 2 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
 
 ##### Máximos y mínimos
-
+# Funciones para calcular los parametros de normalizacion y normalizar
+# Para calcular los parametros de normalizacion, segun la forma de normalizar que se desee:
 # Función auxiliar
 function calculateMinMaxNormalizationParameters(numerics::AbstractArray{<:Real,2})
     m= maximum(numerics, dims=1)
     mi=minimum(numerics, dims=1)
     return (m, mi)
-end
+end;
+
+# 4 versiones de la funcion para normalizar entre 0 y 1:
+#  - Nos dan los parametros de normalizacion, y se quiere modificar el array de entradas (el nombre de la funcion acaba en '!')
+#  - No nos dan los parametros de normalizacion, y se quiere modificar el array de entradas (el nombre de la funcion acaba en '!')
+#  - Nos dan los parametros de normalizacion, y no se quiere modificar el array de entradas (se crea uno nuevo)
+#  - No nos dan los parametros de normalizacion, y no se quiere modificar el array de entradas (se crea uno nuevo)
+
 
 # Función sobrecargada 1
 function normalizeMinMax!(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
@@ -60,10 +70,10 @@ function normalizeMinMax!(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, A
         end
     end
     return norm
-end
+end;
 
 # Función sobrecargada 2
-normalizeMinMax!(numerics::AbstractArray{<:Real,2})=(normalizeMinMax!(numerics, calculateMinMaxNormalizationParameters(numerics)))
+normalizeMinMax!(numerics::AbstractArray{<:Real,2})=(normalizeMinMax!(numerics, calculateMinMaxNormalizationParameters(numerics)));
 
 # Función sobrecargada 3
 function normalizeMinMax(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, AbstractArray{<:Real,2}})
@@ -75,10 +85,10 @@ function normalizeMinMax(numerics::AbstractArray{<:Real,2}, MinMax::NTuple{2, Ab
         end
     end
     return norm
-end
+end;
 
 # Función sobrecargada 4
-normalizeMinMax(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeMinMax(copia, calculateMinMaxNormalizationParameters(numerics)))
+normalizeMinMax(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeMinMax(copia, calculateMinMaxNormalizationParameters(numerics)));
 
 
 ##### Media y desviación típica
@@ -88,7 +98,13 @@ function calculateZeroMeanNormalizationParameters(numerics::AbstractArray{<:Real
     media=mean(numerics, dims=1)
     sd= std(numerics, dims=1)
     return (media, sd)
-end
+end;
+
+# 4 versiones similares de la funcion para normalizar de media 0:
+#  - Nos dan los parametros de normalizacion, y se quiere modificar el array de entradas (el nombre de la funcion acaba en '!')
+#  - No nos dan los parametros de normalizacion, y se quiere modificar el array de entradas (el nombre de la funcion acaba en '!')
+#  - Nos dan los parametros de normalizacion, y no se quiere modificar el array de entradas (se crea uno nuevo)
+#  - No nos dan los parametros de normalizacion, y no se quiere modificar el array de entradas (se crea uno nuevo)
 
 # Función sobrecargada 1
 function normalizeZeroMean!(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
@@ -100,10 +116,10 @@ function normalizeZeroMean!(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{
     end
 
     return norm
-end
+end;
 
 # Función sobrecargada 2
-normalizeZeroMean!(numerics::AbstractArray{<:Real,2})=(normalizeZeroMean!(numerics,calculateZeroMeanNormalizationParameters(numerics_haber)))
+normalizeZeroMean!(numerics::AbstractArray{<:Real,2})=(normalizeZeroMean!(numerics,calculateZeroMeanNormalizationParameters(numerics)));
 
 # Función sobrecargada 3
 function normalizeZeroMean(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2, AbstractArray{<:Real,2}})
@@ -115,15 +131,16 @@ function normalizeZeroMean(numerics::AbstractArray{<:Real,2}, media_sd::NTuple{2
         end
     end
     return norm
-end
+end;
 
 # Función sobrecargada 4
-normalizeZeroMean(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeZeroMean(copia,calculateZeroMeanNormalizationParameters(numerics)))
+normalizeZeroMean(numerics::AbstractArray{<:Real,2})=(copia=copy(numerics);normalizeZeroMean(copia,calculateZeroMeanNormalizationParameters(numerics)));
 
 
-##### classifyOutputs
-
-# Función principal
+# ClassifyOutputs
+# Funciones auxiliar que permite transformar una matriz de
+#  valores reales con las salidas del clasificador o clasificadores
+#  en una matriz de valores booleanos con la clase en la que sera clasificada
 function classifyOutputs(outputs::AbstractArray{<:Real,2}, threshold = 0.5)
     columns = size(outputs)[2]
     if columns == 1
@@ -134,16 +151,13 @@ function classifyOutputs(outputs::AbstractArray{<:Real,2}, threshold = 0.5)
         outputs[indicesMaxEachInstance] = outputs[indicesMaxEachInstance] .= true;
     end
     return outputs
-end
+end;
 
 
-##### accuracy
-
+# accuracy
+# Funciones para calcular la precision
 # Función sobrecargada 1
-function accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{Bool,1})
-    classComparison = targets .== outputs
-    return sum(classComparison)/length(classComparison)
-end
+accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{Bool,1}) = mean(outputs.==targets);
 
 # Función sobrecargada 2
 function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{Bool,2})
@@ -158,15 +172,12 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{Bool,2}
         for row = 1:rows
             classComparison[row,1] = targets[row,:] == outputs[row,:]
         end
-        return sum(classComparison)/length(classComparison)
+        return mean(classComparison)
     end
-end
+end;
 
 # Función sobrecargada 3
-function accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{<:Real,1}, threshold = 0.5)
-    outputs = outputs .>= threshold
-    return accuracy(targets, outputs)
-end
+accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{Float64,1}, threshold::Float64=0.5) = accuracy(Array{Bool,1}(outputs.>=threshold), targets);
 
 # Función sobrecargada 4
 function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,2})
@@ -180,11 +191,15 @@ function accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{<:Real,
         outputs = classifyOutputs(outputs)
         return accuracy(targets, outputs)
     end
-end
+end;
 
+# Añado estas funciones porque las RR.NN.AA. dan la salida como matrices de valores Float32 en lugar de Float64
+# Con estas funciones se pueden usar indistintamente matrices de Float32 o Float64
+accuracy(targets::AbstractArray{Bool,1}, outputs::AbstractArray{Float32,1}, threshold::Float64=0.5) = accuracy(targets, Float64.(outputs), threshold);
+accuracy(targets::AbstractArray{Bool,2}, outputs::AbstractArray{Float32,2})  = accuracy(targets, Float64.(outputs));
 
-##### red neuronal artificial
-
+# Funciones para crear y entrenar una RNA
+# red neuronal artificial
 function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
     ann = Chain();
     numInputsLayer = n_input
@@ -198,19 +213,17 @@ function rna(topology::AbstractArray{<:Int,1}, n_input, n_output)
         ann = Chain(ann...,  Dense(numInputsLayer, n_output, identity), softmax);
     end
     return ann
-end
+end;
 
 
-##### entrenamiento
-
-# Función principal
-function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}};
+# entrenamiento
+function entrenar(topology::AbstractArray{<:Int,1}, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2};
     maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)),
     test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)), maxEpochsVal::Int = 20)
 
-    dataset = (Matrix(dataset[1]'),Matrix(dataset[2]'))
-    n_inputs = size(dataset[1])[1]
-    n_outputs = size(dataset[2])[1]
+    dataset = (Matrix(inputs'),Matrix(targets'))
+    n_inputs = size(inputs)[1]
+    n_outputs = size(targets)[1]
     red = rna(topology, n_inputs, n_outputs)
     loss(x,y) = (size(y,1) == 1) ? Flux.Losses.binarycrossentropy(red(x),y) : Flux.Losses.crossentropy(red(x),y);
     losses_train = zeros(0)
@@ -221,7 +234,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     best_red = 0
     acc = 404
 
-    push!(losses_train, loss(dataset[1],dataset[2]))
+    push!(losses_train, loss(inputs,targets))
     if test != tuple(zeros(0,0), falses(0,0))
         push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
     end
@@ -230,7 +243,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
     end
 
     for i = 1:maxEpochs
-        Flux.train!(loss, params(red), [dataset], ADAM(learningRate))
+        Flux.train!(loss, params(red), (inputs, targets), ADAM(learningRate))
         if validacion != tuple(zeros(0,0), falses(0,0))
             local_loss = loss(Matrix(validacion[1]'), Matrix(validacion[2]'))
             if local_loss < best_loss
@@ -241,7 +254,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
                 cnt += 1
             end
 
-            push!(losses_train, loss(dataset[1],dataset[2]))
+            push!(losses_train, loss(inputs,targets))
             if test != tuple(zeros(0,0), falses(0,0))
                 push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
             end
@@ -255,7 +268,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
                 return (best_red, (losses_train,losses_val,losses_test), acc)
             end
         else
-            push!(losses_train, loss(dataset[1],dataset[2]))
+            push!(losses_train, loss(inputs,targets))
             if test != tuple(zeros(0,0), falses(0,0))
                 push!(losses_test, loss(Matrix(test[1]'), Matrix(test[2]')))
             end
@@ -272,7 +285,7 @@ end
 
 
 # Función sobrecargada
-function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,1}};
+function entrenar(topology::AbstractArray{<:Int,1}, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,1};
     maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,1}}=tuple(zeros(0,0), falses(0)),
     validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,1}}=tuple(zeros(0,0), falses(0)), maxEpochsVal::Int = 20)
 
@@ -292,8 +305,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
         test = tuple(zeros(0,0), falses(0,0))
     end
 
-    target = reshape(dataset[2], (length(dataset[2]),1))
-    inputs = dataset[1]
+    target = reshape(targets, (length(targets),1))
     train = tuple(inputs, target)
 
     return entrenar(topology, train, maxEpochs=maxEpochs, minLoss=minLoss, learningRate=learningRate,
@@ -301,15 +313,18 @@ function entrenar(topology::AbstractArray{<:Int,1}, dataset::Tuple{AbstractArray
 end
 
 
-##### sobreentrenamiento
+# ----------------------------------------------------------------------------------------------
+# ------------------------------------- Practica 3 ---------------------------------------------
+# ----------------------------------------------------------------------------------------------
 
+# sobreentrenamiento
 # Función para conjunto de entrenamiento y test
-function holdOut(N, P)
+function holdOut(N::int, P::Float64)
     d = randperm(N)
     test = d[1:Integer(round(P*N))]
     entrenamiento = d[Integer(round(P*N))+1:end]
     return (entrenamiento, test)
-end
+end;
 
 # Función para conjunto de entrenamiento, validación y test
 function holdOut(N, Pval, Ptest)
@@ -318,7 +333,9 @@ function holdOut(N, Pval, Ptest)
     entrenamiento = d[entrenamiento]
     validacion = d[validacion]
     return (entrenamiento, validacion, test)
-end
+end;
+
+# A PRIORI
 
 
 ##### matriz de confusión
