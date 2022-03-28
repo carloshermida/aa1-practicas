@@ -35,7 +35,7 @@ end;
 
 # Función sobrecargada 1
 # Esta funcion es similar a la anterior, pero si no es especifican las clases, se toman de la propia variable
-oneHotEncoding(feature::AbstractArray{<:Any,1})=oneHotEncoding(feature::AbstractArray{Any,1}, unique(feature));
+oneHotEncoding(feature::AbstractArray{<:Any,1})=oneHotEncoding(feature::AbstractArray{<:Any,1}, unique(feature));
 
 # Función sobrecargada 2
 # Sobrecargamos la funcion oneHotEncoding por si acaso pasan un vector de valores booleanos
@@ -224,7 +224,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, inputs::AbstractArray{<:Real
     maxEpochs::Int = 1000, minLoss::Real = 0, learningRate::Real = 0.01, validacion::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)),
     test::Tuple{AbstractArray{<:Real,2},AbstractArray{Bool,2}}=tuple(zeros(0,0), falses(0,0)), maxEpochsVal::Int = 20)
 
-    dataset = (Matrix(inputs'),Matrix(targets'))
+    inputs, targets = Matrix(inputs'), Matrix(targets')
     n_inputs = size(inputs)[1]
     n_outputs = size(targets)[1]
     red = rna(topology, n_inputs, n_outputs)
@@ -746,10 +746,8 @@ numNeighbors = 3;
 dataset = readdlm("iris.data",',');
 # Preparamos las entradas y las salidas deseadas
 inputs = convert(Array{Float64,2}, dataset[:,1:4]);
-inputs = inputs'
-targets = dataset[:,5];
-####################################################################################################################################
-targets = reshape(targets, (1, 150))
+targets = dataset[:,5]
+
 
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
 normalizeMinMax!(inputs);
