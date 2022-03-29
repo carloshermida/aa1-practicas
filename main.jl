@@ -576,7 +576,7 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
     end;
     println(modelType, ": Average test accuracy on a ", k, "-fold crossvalidation: ", 100*mean(testAcc), ", with a standard deviation of ", 100*std(testAcc));
     println(modelType, ": Average test F1 on a ", k, "-fold crossvalidation: ", 100*mean(testF1), ", with a standard deviation of ", 100*std(testF1));
-    return (mean(testAcc), std(testAcc), mean(testF1), std(testF1));
+    return (testAcc, testF1);
 end;
 
 
@@ -612,11 +612,13 @@ numNeighbors = 3;
 dataset = readdlm("iris.data",',');
 # Preparamos las entradas y las salidas deseadas
 inputs = convert(Array{Float64,2}, dataset[:,1:4]);
-targets = dataset[:,5]
-
+targets = dataset[:,5];
 
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
 normalizeMinMax!(inputs);
+
+# Creamos la lista para las gráficas
+plot_data = Vector{Any}(zeros(0));
 
 # Entrenamos las RR.NN.AA.
 parameters = Dict();
@@ -626,7 +628,7 @@ parameters["validationRatio"] = validationRatio;
 parameters["numExecutions"] = numRepetitionsAANTraining;
 parameters["maxEpochs"] = numMaxEpochs;
 parameters["maxEpochsVal"] = maxEpochsVal;
-modelCrossValidation(:ANN, parameters, inputs, targets, k);
+push!(plot_data, modelCrossValidation(:ANN, parameters, inputs, targets, k));
 
 # Entrenamos las SVM
 parameters = Dict();
@@ -634,13 +636,41 @@ parameters["kernel"] = kernel;
 parameters["kernelDegree"] = kernelDegree;
 parameters["kernelGamma"] = kernelGamma;
 parameters["C"] = C;
-modelCrossValidation(:SVM, parameters, inputs, targets, k);
+push!(plot_data, modelCrossValidation(:SVM, parameters, inputs, targets, k));
 
 # Entrenamos los arboles de decision
-modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k);
+push!(plot_data, modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k));
 
 # Entrenamos los kNN
-modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k);
+push!(plot_data, modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k));
+
+# Mostramos las gráficas
+p1 = plot(title = "ANN");
+plot!(p1, 1:k, plot_data[1][1], label = "accuracy");
+plot!(p1, 1:k, plot_data[1][2], label = "f1");
+plot!(p1, 1:k, fill(mean(plot_data[1][1]), k), label = "media accuracy");
+plot!(p1, 1:k, fill(mean(plot_data[1][2]), k), label = "media f1");
+
+p2 = plot(title = "SVM");
+plot!(p2, 1:k, plot_data[2][1], label = "accuracy");
+plot!(p2, 1:k, plot_data[2][2], label = "f1");
+plot!(p2, 1:k, fill(mean(plot_data[2][1]), k), label = "media accuracy");
+plot!(p2, 1:k, fill(mean(plot_data[2][2]), k), label = "media f1");
+
+p3 = plot(title = "DecisionTree");
+plot!(p3, 1:k, plot_data[3][1], label = "accuracy");
+plot!(p3, 1:k, plot_data[3][2], label = "f1");
+plot!(p3, 1:k, fill(mean(plot_data[3][1]), k), label = "media accuracy");
+plot!(p3, 1:k, fill(mean(plot_data[3][2]), k), label = "media f1");
+
+p4 = plot(title = "kNN");
+plot!(p4, 1:k, plot_data[4][1], label = "accuracy");
+plot!(p4, 1:k, plot_data[4][2], label = "f1");
+plot!(p4, 1:k, fill(mean(plot_data[4][1]), k), label = "media accuracy");
+plot!(p4, 1:k, fill(mean(plot_data[4][2]), k), label = "media f1");
+
+plot(p1, p2, p3, p4, size = (1920, 1080), legend=:bottomleft)
+
 
 
 
@@ -674,11 +704,13 @@ numNeighbors = 3;
 dataset = readdlm("haberman.data",',');
 # Preparamos las entradas y las salidas deseadas
 inputs = convert(Array{Float64,2}, dataset[:,1:3]);
-targets = dataset[:,4]
-
+targets = dataset[:,4];
 
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
 normalizeMinMax!(inputs);
+
+# Creamos la lista para las gráficas
+plot_data = Vector{Any}(zeros(0));
 
 # Entrenamos las RR.NN.AA.
 parameters = Dict();
@@ -688,7 +720,7 @@ parameters["validationRatio"] = validationRatio;
 parameters["numExecutions"] = numRepetitionsAANTraining;
 parameters["maxEpochs"] = numMaxEpochs;
 parameters["maxEpochsVal"] = maxEpochsVal;
-modelCrossValidation(:ANN, parameters, inputs, targets, k);
+push!(plot_data, modelCrossValidation(:ANN, parameters, inputs, targets, k));
 
 # Entrenamos las SVM
 parameters = Dict();
@@ -696,10 +728,37 @@ parameters["kernel"] = kernel;
 parameters["kernelDegree"] = kernelDegree;
 parameters["kernelGamma"] = kernelGamma;
 parameters["C"] = C;
-modelCrossValidation(:SVM, parameters, inputs, targets, k);
+push!(plot_data, modelCrossValidation(:SVM, parameters, inputs, targets, k));
 
 # Entrenamos los arboles de decision
-modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k);
+push!(plot_data, modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k));
 
 # Entrenamos los kNN
-modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k);
+push!(plot_data, modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k));
+
+# Mostramos las gráficas
+p1 = plot(title = "ANN");
+plot!(p1, 1:k, plot_data[1][1], label = "accuracy");
+plot!(p1, 1:k, plot_data[1][2], label = "f1");
+plot!(p1, 1:k, fill(mean(plot_data[1][1]), k), label = "media accuracy");
+plot!(p1, 1:k, fill(mean(plot_data[1][2]), k), label = "media f1");
+
+p2 = plot(title = "SVM");
+plot!(p2, 1:k, plot_data[2][1], label = "accuracy");
+plot!(p2, 1:k, plot_data[2][2], label = "f1");
+plot!(p2, 1:k, fill(mean(plot_data[2][1]), k), label = "media accuracy");
+plot!(p2, 1:k, fill(mean(plot_data[2][2]), k), label = "media f1");
+
+p3 = plot(title = "DecisionTree");
+plot!(p3, 1:k, plot_data[3][1], label = "accuracy");
+plot!(p3, 1:k, plot_data[3][2], label = "f1");
+plot!(p3, 1:k, fill(mean(plot_data[3][1]), k), label = "media accuracy");
+plot!(p3, 1:k, fill(mean(plot_data[3][2]), k), label = "media f1");
+
+p4 = plot(title = "kNN");
+plot!(p4, 1:k, plot_data[4][1], label = "accuracy");
+plot!(p4, 1:k, plot_data[4][2], label = "f1");
+plot!(p4, 1:k, fill(mean(plot_data[4][1]), k), label = "media accuracy");
+plot!(p4, 1:k, fill(mean(plot_data[4][2]), k), label = "media f1");
+
+plot(p1, p2, p3, p4, size = (1920, 1080), legend=:bottomleft)
