@@ -13,7 +13,6 @@ using ScikitLearn
 @sk_import tree: DecisionTreeClassifier
 @sk_import neighbors: KNeighborsClassifier
 
-####################################### FUNCIONES ##############################################
 # ----------------------------------------------------------------------------------------------
 # ------------------------------------- Practica 1 ---------------------------------------------
 # ----------------------------------------------------------------------------------------------
@@ -246,7 +245,7 @@ function entrenar(topology::AbstractArray{<:Int,1}, inputs::AbstractArray{<:Real
     end
 
     for i = 1:maxEpochs
-        Flux.train!(loss, params(red), (inputs, targets), ADAM(learningRate))
+        Flux.train!(loss, params(red), [(inputs, targets)], ADAM(learningRate))
         if validacion != tuple(zeros(0,0), falses(0,0))
             local_loss = loss(Matrix(validacion[1]'), Matrix(validacion[2]'))
             if local_loss < best_loss
@@ -390,7 +389,7 @@ function confusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArra
 end
 
 # Función sobrecargada 2
-function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro") # hay que contemplar el caso en el que los datasets no sean del mismo tamaño? sin querer
+function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}, combination = "macro")
     if size(outputs)[2] == size(targets)[2] > 2
         sensitivity = zeros(0)
         specificity = zeros(0)
@@ -413,7 +412,7 @@ function confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{
 
     else
         outputs, targets = outputs[:,1], targets[:,1]
-        confusionMatrix(outputs, targets)
+        return confusionMatrix(outputs, targets)
     end
 
     means_metrics = zeros(0)
@@ -443,11 +442,21 @@ end
 # Función sobrecargada 4
 function confusionMatrix(outputs::AbstractArray{<:Any}, targets::AbstractArray{<:Any}, combination = "macro")
     if size(outputs)[1] == size(targets)[1]
-        #@assert(all([in(output, unique(targets)) for output in outputs]))
+        @assert(all([in(output, unique(targets)) for output in outputs]))
         targets_classes = unique(targets)
-        outputs = classifyOutputs(outputs)
+
+        if typeof(outputs) == BitMatrix    ## Si el modelo extrañamente devuelve una matriz columna en vez de vector, la cambiamos por vector
+            outputs = outputs[:,1]
+        end
+
+        outputs = oneHotEncoding(outputs)
         targets = oneHotEncoding(targets, targets_classes)
-        return confusionMatrix(outputs, targets, combination)
+
+        if typeof(targets) == typeof(outputs) == BitVector
+            return confusionMatrix(outputs, targets)                ## Si targets y outputs son vectores, van directamente a la confusion matrix de vectores, si no se estará llamando a si misma en bucle
+        else
+            return confusionMatrix(outputs, targets, combination)
+        end
     end
 end
 
@@ -490,7 +499,7 @@ end
 # ------------------------------------- Practica 6 ---------------------------------------------
 # ----------------------------------------------------------------------------------------------
 
-function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{Any,1}, k::Int)
+function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::AbstractArray{<:Real,2}, targets::AbstractArray{<:Any,1}, k::Int)
     @assert(size(inputs,1)==length(targets));
     classes = unique(targets);
     if modelType==:ANN
@@ -518,7 +527,13 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
 
             model = fit!(model, trainInputs, trainTargets);
             testOutputs = predict(model, testInputs);
-            (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
+            if length(unique(testTargets)) > 2
+                acc = confusionMatrix(testOutputs, testTargets)[4];
+                F1 = confusionMatrix(testOutputs, testTargets)[3][5];
+            else
+                (acc, _, _, _, _, _, F1, _) = confusionMatrix(testOutputs, testTargets);
+            end
+
         else
             @assert(modelType==:ANN);
             trainInputs = inputs[crossValidationIndices.!=fold,:];
@@ -544,7 +559,13 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
                         learningRate = parameters["learningRate"], validacion=tuple(zeros(0,0), falses(0,0)),
                         test=tuple(testInputs, testTargets));
                 end;
-                (testAccRep[numTrain], _, _, _, _, _, testF1Rep[numTrain], _) = confusionMatrix(collect(ann(testInputs')'), testTargets);
+
+                if size(testTargets)[2] > 1
+                    testAccRep[numTrain] = confusionMatrix(collect(ann(testInputs')'), testTargets)[4];
+                    testF1Rep[numTrain] = confusionMatrix(collect(ann(testInputs')'), testTargets)[3][5];
+                else
+                    (testAccRep[numTrain], _, _, _, _, _, testF1Rep[numTrain], _) = confusionMatrix(collect(ann(testInputs')'), testTargets);
+                end
             end;
             acc = mean(testAccRep);
             F1  = mean(testF1Rep);
@@ -558,166 +579,11 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
     return (mean(testAcc), std(testAcc), mean(testF1), std(testF1));
 end;
 
+
 ##
-############################### CÓDIGO ###############################
 
-##### HABERMAN
-"""
-dataset_haber = readdlm("haberman.data",',');
-dataset_haber = dataset_haber'
-feature_haber = dataset_haber[4,:]
-feature_haber = convert(AbstractArray{<:Any,1},feature_haber);
-target = oneHotEncoding(feature_haber)
+############################     IRIS     ############################
 
-input = dataset_haber[1:3,:]'
-
-# Dividimos los datos en tres conjuntos
-train_h, val_h, test_h = holdOut(size(input)[1], 0.3, 0.2)
-
-input_train = input[train_h, 1:3]
-maxmin_train = calculateMinMaxNormalizationParameters(input_train)
-input_train = normalizeMinMax(input_train, maxmin_train)
-train = (input_train, target[train_h])
-
-input_val = normalizeMinMax(input[val_h, 1:3], maxmin_train)
-val = (input_val, target[val_h])
-
-input_test = normalizeMinMax(input[test_h, 1:3], maxmin_train)
-test = (input_test, target[test_h])
-
-red_entrenada,losses, acc = entrenar([3], train, validacion = val, test = test)
-
-g = plot()
-plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(g,1:length(losses[2]), losses[2], label = "validación")
-plot!(g,1:length(losses[3]), losses[3], label = "test")
-
-red_entrenada,losses, acc = entrenar([2,2], train,validacion = val, test = test)
-h = plot()
-plot!(h,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(h,1:length(losses[2]), losses[2], label = "validación")
-plot!(h,1:length(losses[3]), losses[3], label = "test")
-
-red_entrenada,losses, acc = entrenar([8], train,validacion = val, test = test)
-k = plot()
-plot!(k,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(k,1:length(losses[2]), losses[2], label = "validación")
-plot!(k,1:length(losses[3]), losses[3], label = "test")
-
-plot(g,h,k,layout = (3,1))
-
-# Matriz de confusión
-outputs = red_entrenada(test[1]')[1,:]
-targets = test[2]
-metrics = confusionMatrix(outputs, targets, 0.5)
-
-
-##### IRIS
-
-# Cargamos los datos
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
-target = oneHotEncoding(feature_iris)
-numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
-
-# Dividimos los datos en tres conjuntos
-train_i, val_i, test_i = holdOut(size(input)[1], 0.2, 0.1)
-train = (input[train_i, 1:4], target[train_i, 1:3])
-val = (input[val_i, 1:4], target[val_i, 1:3])
-test = (input[test_i, 1:4], target[test_i, 1:3])
-
-# Entrenamos la red con el conjunto de entrenamiento y validación
-red_entrenada,losses, acc = entrenar([4], train,validacion = val, test = test)
-g = plot()
-plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(g,1:length(losses[2]), losses[2], label = "validación")
-plot!(g,1:length(losses[3]), losses[3], label = "test")
-
-red_entrenada,losses, acc = entrenar([4,4], train,validacion = val, test = test)
-h = plot()
-plot!(h,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(h,1:length(losses[2]), losses[2], label = "validación")
-plot!(h,1:length(losses[3]), losses[3], label = "test")
-
-red_entrenada,losses, acc = entrenar([8], train,validacion = val, test = test)
-k = plot()
-plot!(k,1:length(losses[1]), losses[1], label = "entrenamiento")
-plot!(k,1:length(losses[2]), losses[2], label = "validación")
-plot!(k,1:length(losses[3]), losses[3], label = "test")
-
-plot(g,h,k,layout = (3,1))
-
-
-##### IRIS
-
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
-target = oneHotEncoding(feature_iris)
-numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
-
-# Uno contra todos
-numClasses = length(unique(feature_iris))
-numInstances = size(dataset_iris)[2]
-outputs = Array{Float32,2}(undef, numInstances, numClasses);
-
-for numClass in 1:numClasses
-    data1 = tuple(input, target[:,[numClass]])
-    model = entrenar([4], data1)[1];
-    outputs[:,numClass] = model(input');
-
-end
-
-outputs = softmax(outputs')'
-vmax = maximum(outputs, dims=2)
-outputs = (outputs .== vmax)
-
-confusionMatrix(outputs, target, "weighted")
-
-# comprobacion practica 5 con iris
-Random.seed!(123)
-dataset_iris = readdlm("iris.data",',');
-dataset_iris = permutedims(dataset_iris)
-feature_iris = dataset_iris[5,:]
-feature_iris = convert(AbstractArray{<:Any,1},feature_iris);
-target = oneHotEncoding(feature_iris)
-numerics_iris = convert(AbstractArray{Float64,2},dataset_iris[1:4,:]')
-input = normalizeZeroMean(numerics_iris, calculateZeroMeanNormalizationParameters(numerics_iris))
-
-k=10
-subset_index=crossvalidation(target, 10)
-numerics_iris=hcat(numerics_iris,subset_index)
-
-crossvalidation_test=Array{Any,1}(undef,k);
-
-for n in 1:k
-    train_rows=numerics_iris[:,5].!=n
-    train=input[train_rows,1:4]
-    test_rows=numerics_iris[:,5].==n
-    test=input[test_rows,1:4]
-    train_targets=target[train_rows,:]
-    test_targets=target[test_rows,:]
-
-    dataset=(train,train_targets)
-    dataset_test=(test, test_targets)
-
-    redes_losses=Array{Any,1}(undef,20);
-    redes_acc=Array{Any,1}(undef,20);
-    for i in 1:20
-        red_entrenada,losses, acc = entrenar([4], dataset, test = dataset_test)
-        redes_losses[i]=losses
-        redes_acc[i]=acc
-    end
-
-    crossvalidation_test[n]=(mean(redes_losses), mean(redes_acc))
-
-end
-"""
 Random.seed!(1);
 
 k = 10;
@@ -763,15 +629,77 @@ parameters["maxEpochsVal"] = maxEpochsVal;
 modelCrossValidation(:ANN, parameters, inputs, targets, k);
 
 # Entrenamos las SVM
-modelHyperparameters = Dict();
-modelHyperparameters["kernel"] = kernel;
-modelHyperparameters["kernelDegree"] = kernelDegree;
-modelHyperparameters["kernelGamma"] = kernelGamma;
-modelHyperparameters["C"] = C;
-modelCrossValidation(:SVM, modelHyperparameters, inputs, targets, numFolds);
+parameters = Dict();
+parameters["kernel"] = kernel;
+parameters["kernelDegree"] = kernelDegree;
+parameters["kernelGamma"] = kernelGamma;
+parameters["C"] = C;
+modelCrossValidation(:SVM, parameters, inputs, targets, k);
 
 # Entrenamos los arboles de decision
-modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, numFolds);
+modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k);
 
 # Entrenamos los kNN
-modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, numFolds);
+modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k);
+
+
+
+############################     HABERMAN     ############################
+
+Random.seed!(1);
+
+k = 10;
+
+# Parametros principales de la RNA y del proceso de entrenamiento
+topology = [4, 3]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
+learningRate = 0.01; # Tasa de aprendizaje
+numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
+validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
+maxEpochsVal = 6; # Numero de ciclos en los que si no se mejora el loss en el conjunto de validacion, se para el entrenamiento
+numRepetitionsAANTraining = 50; # Numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento
+
+# Parametros del SVM
+kernel = "rbf";
+kernelDegree = 3;
+kernelGamma = 2;
+C=1;
+
+# Parametros del arbol de decision
+maxDepth = 4;
+
+# Parapetros de kNN
+numNeighbors = 3;
+
+# Cargamos el dataset
+dataset = readdlm("haberman.data",',');
+# Preparamos las entradas y las salidas deseadas
+inputs = convert(Array{Float64,2}, dataset[:,1:3]);
+targets = dataset[:,4]
+
+
+# Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
+normalizeMinMax!(inputs);
+
+# Entrenamos las RR.NN.AA.
+parameters = Dict();
+parameters["topology"] = topology;
+parameters["learningRate"] = learningRate;
+parameters["validationRatio"] = validationRatio;
+parameters["numExecutions"] = numRepetitionsAANTraining;
+parameters["maxEpochs"] = numMaxEpochs;
+parameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, parameters, inputs, targets, k);
+
+# Entrenamos las SVM
+parameters = Dict();
+parameters["kernel"] = kernel;
+parameters["kernelDegree"] = kernelDegree;
+parameters["kernelGamma"] = kernelGamma;
+parameters["C"] = C;
+modelCrossValidation(:SVM, parameters, inputs, targets, k);
+
+# Entrenamos los arboles de decision
+modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k);
+
+# Entrenamos los kNN
+modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k);
