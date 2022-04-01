@@ -681,7 +681,7 @@ Random.seed!(1);
 k = 10;
 
 # Parametros principales de la RNA y del proceso de entrenamiento
-topology = [4, 3]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
+topology = [4]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
 learningRate = 0.01; # Tasa de aprendizaje
 numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
 validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
@@ -762,3 +762,15 @@ plot!(p4, 1:k, fill(mean(plot_data[4][1]), k), label = "media accuracy");
 plot!(p4, 1:k, fill(mean(plot_data[4][2]), k), label = "media f1");
 
 plot(p1, p2, p3, p4, size = (1920, 1080), legend=:bottomleft)
+
+
+# NORMALIZAMOS LOS DATOS COMO INDICAMOS EN LA MEMORIA
+dataset = readdlm("haberman.data",',');
+inputs = convert(Array{Float64,2}, dataset[:,1:3])
+targets = dataset[:,4];
+año = reshape(inputs[:,2], (size(dataset)[1], 1))
+inputs[:,2] = normalizeMinMax(año)
+edad = reshape(inputs[:,1], (size(dataset)[1], 1))
+ganglios = reshape(inputs[:,3], (size(dataset)[1], 1))
+inputs[:,1] = normalizeZeroMean(edad)
+inputs[:,3] = normalizeZeroMean(ganglios)
