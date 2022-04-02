@@ -581,99 +581,6 @@ end;
 
 
 ##
-
-############################     IRIS     ############################
-
-Random.seed!(1);
-
-k = 10;
-
-# Parametros principales de la RNA y del proceso de entrenamiento
-topology = [4, 3]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
-learningRate = 0.01; # Tasa de aprendizaje
-numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
-validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
-maxEpochsVal = 6; # Numero de ciclos en los que si no se mejora el loss en el conjunto de validacion, se para el entrenamiento
-numRepetitionsAANTraining = 50; # Numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento
-
-# Parametros del SVM
-kernel = "rbf";
-kernelDegree = 3;
-kernelGamma = 2;
-C=1;
-
-# Parametros del arbol de decision
-maxDepth = 4;
-
-# Parapetros de kNN
-numNeighbors = 3;
-
-# Cargamos el dataset
-dataset = readdlm("iris.data",',');
-# Preparamos las entradas y las salidas deseadas
-inputs = convert(Array{Float64,2}, dataset[:,1:4]);
-targets = dataset[:,5];
-
-# Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
-normalizeMinMax!(inputs);
-
-# Creamos la lista para las gráficas
-plot_data = Vector{Any}(zeros(0));
-
-# Entrenamos las RR.NN.AA.
-parameters = Dict();
-parameters["topology"] = topology;
-parameters["learningRate"] = learningRate;
-parameters["validationRatio"] = validationRatio;
-parameters["numExecutions"] = numRepetitionsAANTraining;
-parameters["maxEpochs"] = numMaxEpochs;
-parameters["maxEpochsVal"] = maxEpochsVal;
-push!(plot_data, modelCrossValidation(:ANN, parameters, inputs, targets, k));
-
-# Entrenamos las SVM
-parameters = Dict();
-parameters["kernel"] = kernel;
-parameters["kernelDegree"] = kernelDegree;
-parameters["kernelGamma"] = kernelGamma;
-parameters["C"] = C;
-push!(plot_data, modelCrossValidation(:SVM, parameters, inputs, targets, k));
-
-# Entrenamos los arboles de decision
-push!(plot_data, modelCrossValidation(:DecisionTree, Dict("maxDepth" => maxDepth), inputs, targets, k));
-
-# Entrenamos los kNN
-push!(plot_data, modelCrossValidation(:kNN, Dict("numNeighbors" => numNeighbors), inputs, targets, k));
-
-# Mostramos las gráficas
-p1 = plot(title = "ANN");
-plot!(p1, 1:k, plot_data[1][1], label = "accuracy");
-plot!(p1, 1:k, plot_data[1][2], label = "f1");
-plot!(p1, 1:k, fill(mean(plot_data[1][1]), k), label = "media accuracy");
-plot!(p1, 1:k, fill(mean(plot_data[1][2]), k), label = "media f1");
-
-p2 = plot(title = "SVM");
-plot!(p2, 1:k, plot_data[2][1], label = "accuracy");
-plot!(p2, 1:k, plot_data[2][2], label = "f1");
-plot!(p2, 1:k, fill(mean(plot_data[2][1]), k), label = "media accuracy");
-plot!(p2, 1:k, fill(mean(plot_data[2][2]), k), label = "media f1");
-
-p3 = plot(title = "DecisionTree");
-plot!(p3, 1:k, plot_data[3][1], label = "accuracy");
-plot!(p3, 1:k, plot_data[3][2], label = "f1");
-plot!(p3, 1:k, fill(mean(plot_data[3][1]), k), label = "media accuracy");
-plot!(p3, 1:k, fill(mean(plot_data[3][2]), k), label = "media f1");
-
-p4 = plot(title = "kNN");
-plot!(p4, 1:k, plot_data[4][1], label = "accuracy");
-plot!(p4, 1:k, plot_data[4][2], label = "f1");
-plot!(p4, 1:k, fill(mean(plot_data[4][1]), k), label = "media accuracy");
-plot!(p4, 1:k, fill(mean(plot_data[4][2]), k), label = "media f1");
-
-plot(p1, p2, p3, p4, size = (1920, 1080), legend=:bottomleft)
-
-
-
-
 ############################     HABERMAN     ############################
 
 Random.seed!(1);
@@ -681,7 +588,7 @@ Random.seed!(1);
 k = 10;
 
 # Parametros principales de la RNA y del proceso de entrenamiento
-topology = [4]; # Dos capas ocultas con 4 neuronas la primera y 3 la segunda
+topology = [2]; # Una capa oculta con 2 neuronas
 learningRate = 0.01; # Tasa de aprendizaje
 numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
 validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
@@ -690,9 +597,9 @@ numRepetitionsAANTraining = 50; # Numero de veces que se va a entrenar la RNA pa
 
 # Parametros del SVM
 kernel = "rbf";
-kernelDegree = 3;
-kernelGamma = 2;
-C=1;
+kernelDegree = 4;
+kernelGamma = 3;
+C=2;
 
 # Parametros del arbol de decision
 maxDepth = 4;
@@ -707,7 +614,13 @@ inputs = convert(Array{Float64,2}, dataset[:,1:3]);
 targets = dataset[:,4];
 
 # Normalizamos las entradas, a pesar de que algunas se vayan a utilizar para test
-normalizeMinMax!(inputs);
+año = reshape(inputs[:,2], (size(dataset)[1], 1))
+inputs[:,2] = normalizeMinMax(año)
+edad = reshape(inputs[:,1], (size(dataset)[1], 1))
+ganglios = reshape(inputs[:,3], (size(dataset)[1], 1))
+inputs[:,1] = normalizeZeroMean(edad)
+inputs[:,3] = normalizeZeroMean(ganglios)
+
 
 # Creamos la lista para las gráficas
 plot_data = Vector{Any}(zeros(0));
@@ -762,15 +675,3 @@ plot!(p4, 1:k, fill(mean(plot_data[4][1]), k), label = "media accuracy");
 plot!(p4, 1:k, fill(mean(plot_data[4][2]), k), label = "media f1");
 
 plot(p1, p2, p3, p4, size = (1920, 1080), legend=:bottomleft)
-
-
-# NORMALIZAMOS LOS DATOS COMO INDICAMOS EN LA MEMORIA
-dataset = readdlm("haberman.data",',');
-inputs = convert(Array{Float64,2}, dataset[:,1:3])
-targets = dataset[:,4];
-año = reshape(inputs[:,2], (size(dataset)[1], 1))
-inputs[:,2] = normalizeMinMax(año)
-edad = reshape(inputs[:,1], (size(dataset)[1], 1))
-ganglios = reshape(inputs[:,3], (size(dataset)[1], 1))
-inputs[:,1] = normalizeZeroMean(edad)
-inputs[:,3] = normalizeZeroMean(ganglios)
