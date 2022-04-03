@@ -511,6 +511,7 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
     testF1 = Array{Float64,1}(undef, k);
 
     for fold in 1:k
+        losses = Array{Any,1}(undef, 0);
         if (modelType==:SVM) || (modelType==:DecisionTree) || (modelType==:kNN)
             trainInputs = inputs[crossValidationIndices.!=fold,:];
             testInputs = inputs[crossValidationIndices.==fold,:];
@@ -547,14 +548,14 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
             for numTrain in 1:parameters["numExecutions"]
                 if parameters["validationRatio"]>0
                     (trainIndices, validationIndices) = holdOut(size(trainInputs,1), parameters["validationRatio"]*size(trainInputs,1)/size(inputs,1));
-                    ann, = entrenar(parameters["topology"],
+                    ann,losses = entrenar(parameters["topology"],
                         trainInputs[trainIndices,:],   trainTargets[trainIndices,:], maxEpochs = parameters["maxEpochs"],
                         minLoss = 0, learningRate = parameters["learningRate"],
                         validacion=tuple(trainInputs[validationIndices,:], trainTargets[validationIndices,:]),
                         test=tuple(testInputs, testTargets);
                         maxEpochsVal = parameters["maxEpochsVal"]);
                 else
-                    ann, = entrenar(parameters["topology"],
+                    ann,losses = entrenar(parameters["topology"],
                         trainInputs, trainTargets, maxEpochs = parameters["maxEpochs"], minLoss = 0,
                         learningRate = parameters["learningRate"], validacion=tuple(zeros(0,0), falses(0,0)),
                         test=tuple(testInputs, testTargets));
@@ -569,6 +570,13 @@ function modelCrossValidation(modelType::Symbol, parameters::Dict, inputs::Abstr
             end;
             acc = mean(testAccRep);
             F1  = mean(testF1Rep);
+
+            g = plot(title = fold);
+            plot!(g,1:length(losses[1]), losses[1], label = "entrenamiento");
+            plot!(g,1:length(losses[2]), losses[2], label = "validación");
+            plot!(g,1:length(losses[3]), losses[3], label = "test");
+            display(g)
+
         end;
         testAcc[fold] = acc;
         testF1[fold] = F1;
