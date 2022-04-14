@@ -29,12 +29,16 @@ end
 
 function featureExtraction(window::Array{Float64}) #la ventana es una imagen pasada a array
     if typeof(window)==Array{Float64, 3}
-        car = zeros(2,3)
+        car = zeros(1,6)
+        cnt = 1
         for i=1:3
             color = window[:,:,i]
-            car[1,i] = mean(color)
-            car[2,i] = std(color)
+            car[1,cnt] = mean(color)
+            cnt += 1
+            car[1,cnt] = std(color)
+            cnt += 1
         end
+
     elseif typeof(window)==Array{Float64, 2}
         sym=symmetry(window)
         car = zeros(1,6)
@@ -82,3 +86,28 @@ GrayDataset1 = funcionesUtiles.imageToGrayArray(img1)
 GrayDataset1[:,1]
 symmetry(GrayDataset1)
 featureExtraction(GrayDataset1)
+
+inputsG = normalizeZeroMean(inputsG) ######### datos acotados???
+targetsMatrix = reshape(targets, length(targets), 1) ############# borrar????
+trainingDataset = (inputsG, targetsMatrix)
+rna = trainClassANN([2], trainingDataset)
+
+
+k = 10;
+
+# Parametros principales de la RNA y del proceso de entrenamiento
+topology = [2]; # Una capa oculta con 2 neuronas
+learningRate = 0.01; # Tasa de aprendizaje
+numMaxEpochs = 1000; # Numero maximo de ciclos de entrenamiento
+validationRatio = 0; # Porcentaje de patrones que se usaran para validacion. Puede ser 0, para no usar validacion
+maxEpochsVal = 6; # Numero de ciclos en los que si no se mejora el loss en el conjunto de validacion, se para el entrenamiento
+numRepetitionsAANTraining = 50; # Numero de veces que se va a entrenar la RNA para cada fold por el hecho de ser no determinístico el entrenamiento
+
+parameters = Dict()
+parameters["topology"] = topology;
+parameters["learningRate"] = learningRate;
+parameters["validationRatio"] = validationRatio;
+parameters["numExecutions"] = numRepetitionsAANTraining;
+parameters["maxEpochs"] = numMaxEpochs;
+parameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, parameters, inputsG, targets, k)
