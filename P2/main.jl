@@ -93,7 +93,7 @@ char= featureExtraction(GrayDataset)'
 eye = ClassifyEye(img, rna, 0.3)
 
 
-img_path1 = "negativos/6.bmp"
+img_path1 = "negativos/17.bmp"
 img1 = load(img_path1)
 GrayDataset1 = funcionesUtiles.imageToGrayArray(img1)
 GrayDataset1[:,1]
@@ -126,3 +126,29 @@ parameters["maxEpochsVal"] = maxEpochsVal;
 modelCrossValidation(:ANN, parameters, inputsG, targets, k)
 
 (rna,losses) = trainClassANN([4], trainingDataset)
+
+
+img_path2 = "testFinal/image_0263.jpg"
+img2 = load(img_path2)
+
+ColorDataset = funcionesUtiles.imageToColorArray(img2)
+minWindowSizeY = minimum(size.(ColorDataset, 1));
+maxWindowSizeY = maximum(size.(ColorDataset, 1));
+minWindowSizeX = minimum(size.(ColorDataset, 2));
+maxWindowSizeX = maximum(size.(ColorDataset, 2));
+windowLocations = Array{Int64,1}[];
+for windowWidth = minWindowSizeX:4:maxWindowSizeX
+    for windowHeight = minWindowSizeY:4:maxWindowSizeY
+        for x1 = 1:10:size(img2,2)-windowWidth
+            for y1 = 1:10:size(img2,1)-windowHeight
+                x2 = x1 + windowWidth;
+                y2 = y1 + windowHeight;
+                #print(ColorDataset[y1:y2, x1:x2, :])ç
+                print(typeof(img2[y1:y2, x1:x2, :]))
+                if ClassifyEye(img2[y1:y2, x1:x2], rna, 0.3)
+                    push!(windowLocations, [x1, x2, y1, y2]);
+                end;
+            end;
+        end;
+    end;
+end;
