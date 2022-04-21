@@ -69,6 +69,7 @@ end;
 inputsC = vcat(featureExtraction.(colorDataset)...);
 inputsG = vcat(featureExtraction.(grayDataset)...);
 
+positive = colorDataset[targets .== 1]
 
 """
 colorDatasetN, grayDatasetN = loadFolderImages("negativos")
@@ -132,10 +133,10 @@ img_path2 = "testFinal/image_0263.jpg"
 img2 = load(img_path2)
 
 ColorDataset = funcionesUtiles.imageToColorArray(img2)
-minWindowSizeY = minimum(size.(ColorDataset, 1));
-maxWindowSizeY = maximum(size.(ColorDataset, 1));
-minWindowSizeX = minimum(size.(ColorDataset, 2));
-maxWindowSizeX = maximum(size.(ColorDataset, 2));
+minWindowSizeY = minimum(size.(positive, 1));
+maxWindowSizeY = maximum(size.(positive, 1));
+minWindowSizeX = minimum(size.(positive, 2));
+maxWindowSizeX = maximum(size.(positive, 2));
 windowLocations = Array{Int64,1}[];
 for windowWidth = minWindowSizeX:4:maxWindowSizeX
     for windowHeight = minWindowSizeY:4:maxWindowSizeY
@@ -144,8 +145,8 @@ for windowWidth = minWindowSizeX:4:maxWindowSizeX
                 x2 = x1 + windowWidth;
                 y2 = y1 + windowHeight;
                 #print(ColorDataset[y1:y2, x1:x2, :])ç
-                print(typeof(img2[y1:y2, x1:x2, :]))
-                if ClassifyEye(img2[y1:y2, x1:x2], rna, 0.3)
+                #print(typeof(img2[y1:y2, x1:x2, :]))
+                if ClassifyEye(img2[y1:y2, x1:x2], rna, 0.3) == 1
                     push!(windowLocations, [x1, x2, y1, y2]);
                 end;
             end;
