@@ -68,6 +68,7 @@ end;
 (colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
 inputsC = vcat(featureExtraction.(colorDataset)...);
 inputsG = vcat(featureExtraction.(grayDataset)...);
+inputs = [inputsC inputsG]
 
 positive = colorDataset[targets .== 1]
 
@@ -91,7 +92,7 @@ img = load(img_path)
 GrayDataset = funcionesUtiles.imageToGrayArray(img)
 symmetry(GrayDataset)
 char= featureExtraction(GrayDataset)'
-eye = ClassifyEye(img, rna, 0.3)
+eye = ClassifyEye(img, rna, 0.02)
 
 
 img_path1 = "negativos/17.bmp"
@@ -100,7 +101,7 @@ GrayDataset1 = funcionesUtiles.imageToGrayArray(img1)
 GrayDataset1[:,1]
 symmetry(GrayDataset1)
 char=featureExtraction(GrayDataset1)'
-eye = ClassifyEye(img1, rna, 0.3)
+eye = ClassifyEye(img1, rna, 0.02)
 
 inputsG = normalizeZeroMean(inputsG) ######### datos acotados???
 targetsMatrix = reshape(targets, length(targets), 1) ############# borrar????
@@ -153,3 +154,10 @@ for windowWidth = minWindowSizeX:4:maxWindowSizeX
         end;
     end;
 end;
+
+
+for i=1:size(windowLocations)[1]
+    funcionesUtiles.setRedBox!(ColorDataset, windowLocations[i][1],windowLocations[i][2],windowLocations[i][3],windowLocations[i][4])
+end
+
+display(ColorDataset)
