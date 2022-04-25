@@ -53,10 +53,14 @@ function featureExtraction(window::Array{Float64}) #la ventana es una imagen pas
     return car
 end;
 
-function ClassifyEye(window, rna, threshold)
-    window = funcionesUtiles.imageToGrayArray(window)
-    char = featureExtraction(window)'
-    result = rna(char)
+function ClassifyEye(img, rna, threshold, NormalizationParameters)
+    ColorDataset = funcionesUtiles.imageToColorArray(img)
+    GrayDataset = funcionesUtiles.imageToGrayArray(img)
+    charC = featureExtraction(ColorDataset)
+    charG = featureExtraction(GrayDataset)
+    char = hcat(charC, charG)
+    normalizeZeroMean!(char, NormalizationParameters)
+    result = rna(char')
     if result[1] <= threshold
         return 1
     else
@@ -72,40 +76,26 @@ inputs = [inputsC inputsG]
 
 positive = colorDataset[targets .== 1]
 
-"""
-colorDatasetN, grayDatasetN = loadFolderImages("negativos")
-inputsCN = vcat(featureExtraction.(colorDatasetN)...);
-inputsGN = vcat(featureExtraction.(grayDatasetN)...);
+inputs = normalizeZeroMean(inputs) ######### datos acotados???
+NormalizationParameters = calculateZeroMeanNormalizationParameters(inputs)
 
-colorDatasetP, grayDatasetP = loadFolderImages("positivos")
-inputsCP = vcat(featureExtraction.(colorDatasetP)...);
-inputsGP = vcat(featureExtraction.(grayDatasetP)...);
+targetsMatrix = reshape(targets, length(targets), 1) ############# borrar????
+trainingDataset = (inputs, targetsMatrix)
 
-img_path = "positivos/image_0003-1.bmp"
-img = load(img_path)
-ColorDataset = imageToColorArray(img)
-futureExtraction(img)
-"""
+(rna,losses) = trainClassANN([4], trainingDataset)
+
+# COMPROBAR
 
 img_path = "positivos/image_0003-1.bmp"
-img = load(img_path)
-GrayDataset = funcionesUtiles.imageToGrayArray(img)
-symmetry(GrayDataset)
-char= featureExtraction(GrayDataset)'
-eye = ClassifyEye(img, rna, 0.02)
+img = load(img_path);
+eye = ClassifyEye(img, rna, 0.01, NormalizationParameters)
 
 
 img_path1 = "negativos/17.bmp"
-img1 = load(img_path1)
-GrayDataset1 = funcionesUtiles.imageToGrayArray(img1)
-GrayDataset1[:,1]
-symmetry(GrayDataset1)
-char=featureExtraction(GrayDataset1)'
-eye = ClassifyEye(img1, rna, 0.02)
+img1 = load(img_path1);
+eye = ClassifyEye(img1, rna, 0.01, NormalizationParameters)
 
-inputsG = normalizeZeroMean(inputsG) ######### datos acotados???
-targetsMatrix = reshape(targets, length(targets), 1) ############# borrar????
-trainingDataset = (inputsG, targetsMatrix)
+##########################
 
 
 k = 10;
@@ -147,7 +137,7 @@ for windowWidth = minWindowSizeX:4:maxWindowSizeX
                 y2 = y1 + windowHeight;
                 #print(ColorDataset[y1:y2, x1:x2, :])ç
                 #print(typeof(img2[y1:y2, x1:x2, :]))
-                if ClassifyEye(img2[y1:y2, x1:x2], rna, 0.3) == 1
+                if ClassifyEye(img2[y1:y2, x1:x2], rna, 0.01, NormalizationParameters) == 1
                     push!(windowLocations, [x1, x2, y1, y2]);
                 end;
             end;
