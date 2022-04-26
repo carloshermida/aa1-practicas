@@ -30,39 +30,105 @@ function symmetry(window::Array{Float64,2})
     end
     VError=abs.(window-VerticalSymmetrical)
     HError=abs.(window-HorizontalSymmetrical)
-    return (VError, HError)
+
+    result = zeros(1,4)
+    result[1,1] = mean(VError)
+    result[1,2] = std(VError)
+    result[1,3] = mean(HError)
+    result[1,4] = std(HError)
+
+    return result
 end
+
+
+##### differences
+
+function differences(grayImage)
+    rows = size(grayImage)[1]
+    columns = size(grayImage)[2]
+    diff_matrix = zeros(rows, columns)
+    for i in 1:rows
+        for j in 1:columns-1
+            diff = abs(grayImage[i,j]-grayImage[i,j+1])
+            diff_matrix[i,j] = diff
+        end
+    end
+    #return diff_matrix
+
+    ############################################
+    # QUE DATOS SACAR DE AQUI ??
+    ############################################
+
+    # OPCIÓN 1
+    result = zeros(1,9)
+
+    # TOP
+    result[1,1] = mean(diff_matrix[1,:])
+    result[1,2] = mean(diff_matrix[2,:])
+    result[1,3] = mean(diff_matrix[3,:])
+    # MIDDLE
+    mid = div(rows,2)
+    result[1,4] = mean(diff_matrix[mid-1,:])
+    result[1,5] = mean(diff_matrix[mid,:])
+    result[1,6] = mean(diff_matrix[mid+1,:])
+    # BOTTOM
+    result[1,7] = mean(diff_matrix[end-2,:])
+    result[1,8] = mean(diff_matrix[end-1,:])
+    result[1,9] = mean(diff_matrix[end,:])
+
+    """
+    # OPCIÓN 2
+    result = zeros(1,2)
+    result[1,1] = mean(diff_matrix)
+    result[1,2] = std(diff_matrix)
+    """
+
+    ############################################
+
+    return result
+end
+
+# (TEST DIFFERENCES)
+
+img_path = "positivos/image_0001-1.bmp";
+img = load(img_path);
+display(img)
+grayImage = funcionesUtiles.imageToGrayArray(img);
+grayImage = grayImage/mean(grayImage) #BRILLO
+x = differences(grayImage)
+display(x)
+
+
+img_path = "negativos/2.bmp";
+img = load(img_path);
+display(img)
+grayImage = funcionesUtiles.imageToGrayArray(img);
+grayImage = grayImage/mean(grayImage) #BRILLO
+x = differences(grayImage)
+display(x)
 
 
 ##### featureExtraction
 
-function featureExtraction(window::Array{Float64}) #la ventana es una imagen pasada a array
+function featureExtraction(window::Array{Float64})
     if typeof(window)==Array{Float64, 3}
-        car = zeros(1,6)
+        char = zeros(1,6)
         cnt = 1
         for i=1:3
             color = window[:,:,i]/mean(window[:,:,i])
-            car[1,cnt] = mean(color)
+            char[1,cnt] = mean(color)
             cnt += 1
-            car[1,cnt] = std(color)
+            char[1,cnt] = std(color)
             cnt += 1
+            char = hcat(char, symmetry(color))
         end
 
     elseif typeof(window)==Array{Float64, 2}
         window = window/mean(window)
-        sym=symmetry(window)
-        car = zeros(1,6)
-        car[1,1] = mean(window)
-        car[1,2] = std(window)
-        car[1,3]=mean(sym[1])
-        car[1,4]=std(sym[1])
-        car[1,5]=mean(sym[2])
-        car[1,6]=std(sym[2])
-
-        car = hcat(car, differences(window))
+        char = differences(window)
     end
 
-    return car
+    return char
 end
 
 
@@ -74,7 +140,7 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, log=false)
     charC = featureExtraction(ColorDataset)
     charG = featureExtraction(GrayDataset)
     char = hcat(charC, charG)
-    normalizeZeroMean!(char, NormalizationParameters)
+    normalizeMinMax!(char, NormalizationParameters)
     result = rna(char')
     if log
         print(result)
@@ -87,61 +153,6 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, log=false)
 end
 
 
-##### differences
-
-function differences(grayImage)
-    grayImage = grayImage/mean(grayImage) #BRILLO
-    rows = size(grayImage)[1]
-    columns = size(grayImage)[2]
-    diff_matrix = zeros(rows, columns)
-
-    for i in 1:rows
-        for j in 1:columns-1
-            diff = abs(grayImage[i,j]-grayImage[i,j+1])
-            diff_matrix[i,j] = diff
-        end
-    end
-
-    #return diff_matrix
-
-    result = zeros(1,9)
-
-    # TOP
-    result[1,1] = mean(diff_matrix[1,:])
-    result[1,2] = mean(diff_matrix[2,:])
-    result[1,3] = mean(diff_matrix[3,:])
-
-    # MIDDLE
-    mid = div(rows,2)
-    result[1,4] = mean(diff_matrix[mid-1,:])
-    result[1,5] = mean(diff_matrix[mid,:])
-    result[1,6] = mean(diff_matrix[mid+1,:])
-
-    # BOTTOM
-    result[1,7] = mean(diff_matrix[end-2,:])
-    result[1,8] = mean(diff_matrix[end-1,:])
-    result[1,9] = mean(diff_matrix[end,:])
-
-    return result
-
-end
-
-"""
-img_path = "positivos/image_0001-1.bmp";
-img = load(img_path);
-display(img)
-grayImage = funcionesUtiles.imageToGrayArray(img);
-x = differences(grayImage)
-display(x)
-
-
-img_path = "negativos/2.bmp";
-img = load(img_path);
-display(img)
-grayImage = funcionesUtiles.imageToGrayArray(img);
-x = differences(grayImage)
-display(x)
-"""
 
 ############################### CÓDIGO ###############################
 
@@ -160,15 +171,31 @@ trainingDataset = (inputs, targetsMatrix)
 
 # Entrenamos la red y comprobamos su funcionamiento
 (rna,losses) = trainClassANN([4], trainingDataset);
-testThreshold = 0.5;
+testThreshold = 0.8;
 
-### Positivo
+### Positivos
 img_path = "positivos/image_0003-1.bmp";
 img = load(img_path);
 eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
 
-### Negativo
+img_path = "positivos/image_0001-1.bmp";
+img = load(img_path);
+eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
+
+img_path = "positivos/image_0101-1.bmp";
+img = load(img_path);
+eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
+
+### Negativos
 img_path1 = "negativos/17.bmp";
+img1 = load(img_path1);
+eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
+
+img_path1 = "negativos/7.bmp";
+img1 = load(img_path1);
+eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
+
+img_path1 = "negativos/1.bmp";
 img1 = load(img_path1);
 eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
 
@@ -202,7 +229,7 @@ maxWindowSizeY = maximum(size.(colorDataset, 1));
 minWindowSizeX = minimum(size.(colorDataset, 2));
 maxWindowSizeX = maximum(size.(colorDataset, 2));
 
-detectionThreshold = 0.7;
+detectionThreshold = 0.8;
 windowLocations = Array{Int64,1}[];
 for windowWidth = minWindowSizeX:4:maxWindowSizeX
     for windowHeight = minWindowSizeY:4:maxWindowSizeY
@@ -218,8 +245,8 @@ for windowWidth = minWindowSizeX:4:maxWindowSizeX
     end
 end
 
-colorImage = funcionesUtiles.imageToColorArray(img2);
+testImage = funcionesUtiles.imageToColorArray(img);
 for i=1:size(windowLocations)[1]
-    funcionesUtiles.setRedBox!(colorImage, windowLocations[i][1],windowLocations[i][2],windowLocations[i][3],windowLocations[i][4])
+    funcionesUtiles.setRedBox!(testImage, windowLocations[i][1],windowLocations[i][2],windowLocations[i][3],windowLocations[i][4])
 end
-display(colorImage)
+display(testImage)
