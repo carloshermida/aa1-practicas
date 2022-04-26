@@ -76,13 +76,6 @@ function differences(grayImage)
     result[1,8] = mean(diff_matrix[end-1,:])
     result[1,9] = mean(diff_matrix[end,:])
 
-    """
-    # OPCIÓN 2
-    result = zeros(1,2)
-    result[1,1] = mean(diff_matrix)
-    result[1,2] = std(diff_matrix)
-    """
-
     ############################################
 
     return result
@@ -169,35 +162,37 @@ NormalizationParameters = calculateMinMaxNormalizationParameters(inputs);
 targetsMatrix = reshape(targets, length(targets), 1);
 trainingDataset = (inputs, targetsMatrix)
 
-# Entrenamos la red y comprobamos su funcionamiento
+# Entrenamos la red
 (rna,losses) = trainClassANN([4], trainingDataset);
-testThreshold = 0.8;
+detectionThreshold = 0.8;
+
+# Comprobamos su funcionamiento
+function check(folderName::String)
+    isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG", ".BMP"]);
+    images = [];
+    for fileName in readdir(folderName)
+        if isImageExtension(fileName)
+            image = load(string(folderName, "/", fileName));
+            @assert(isa(image, Array{<:Colorant,2}))
+            push!(images, image);
+        end;
+    end;
+    return images
+end
 
 ### Positivos
-img_path = "positivos/image_0003-1.bmp";
-img = load(img_path);
-eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
-
-img_path = "positivos/image_0001-1.bmp";
-img = load(img_path);
-eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
-
-img_path = "positivos/image_0101-1.bmp";
-img = load(img_path);
-eye = ClassifyEye(img, rna, testThreshold, NormalizationParameters, true)
+pos_check = zeros(0);
+for item in check("positivos")
+    push!(pos_check, ClassifyEye(item, rna, detectionThreshold, NormalizationParameters, true))
+end
+sum(pos_check)
 
 ### Negativos
-img_path1 = "negativos/17.bmp";
-img1 = load(img_path1);
-eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
-
-img_path1 = "negativos/7.bmp";
-img1 = load(img_path1);
-eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
-
-img_path1 = "negativos/1.bmp";
-img1 = load(img_path1);
-eye = ClassifyEye(img1, rna, testThreshold, NormalizationParameters, true)
+neg_check = zeros(0);
+for item in check("negativos")
+    push!(neg_check, ClassifyEye(item, rna, detectionThreshold, NormalizationParameters, true))
+end
+sum(neg_check)
 
 
 # Entrenamos con CrossValidation
@@ -229,7 +224,6 @@ maxWindowSizeY = maximum(size.(colorDataset, 1));
 minWindowSizeX = minimum(size.(colorDataset, 2));
 maxWindowSizeX = maximum(size.(colorDataset, 2));
 
-detectionThreshold = 0.8;
 windowLocations = Array{Int64,1}[];
 for windowWidth = minWindowSizeX:4:maxWindowSizeX
     for windowHeight = minWindowSizeY:4:maxWindowSizeY
