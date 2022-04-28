@@ -101,6 +101,29 @@ x = differences(grayImage)
 display(x)
 
 
+##### sixDivision
+
+function sixDivision(window)
+    columns = size(window)[2]
+    x = div(columns,6)
+    res = columns % 6
+    divisions = ones(6)*x
+    for i = 1:res
+        divisions[i] += 1
+    end
+
+    pos = divisions[1]
+    window[:,(1:pos)]
+    next_pos
+
+    pos += divisons[2]
+    window[:,(pos+1:pos)]
+
+
+end
+
+
+
 ##### featureExtraction
 
 function featureExtraction(window::Array{Float64})
