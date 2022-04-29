@@ -4,6 +4,8 @@
 
 
 push!(LOAD_PATH, ".")
+# Importamos los mmódulos donde tenemos las otras funciones que nos podrían hacer
+# falta
 using Main.modelComparison
 using Main.funcionesUtiles
 using Images
@@ -16,7 +18,14 @@ import FileIO
 ############################## FUNCIONES ##############################
 
 ##### symmetry
-
+# Con esta función miramos la simetría de las imágenes. Lo que hacemos es crear
+# dos nuevas imágenes en forma de array, una de ellas igual a la original pero
+# girada según el eje vertical y la otra lo mismo pero según el eje horizontal.
+# A continuación, obtenemos el mismo píxel en una imagen que en la otra y restamos
+# los valores, de manera que si son simétricos (valores parecidos) esta diferencia
+# va a ser pequeña, mientras que si son muy distintos, resultará un valr muy grande.
+# Finalmente, de estas dierencias, obtenemos la media y desviación típica y las
+# devlvemos en forma de matriz fila
 function symmetry(window::Array{Float64,2})
     rows=size(window,1)
     columns=size(window,2)
@@ -42,7 +51,11 @@ end
 
 
 ##### differences
-
+# Con esta función miramos la diferencia entre un pixel y el de al lado para
+# obtener "bordes". Esto lo hacemos por columnas y guardamos esto en una matriz
+# Con esta matriz, lo que hacemos es coger la media de color de las tres filas
+# superiores, las tres inferiores y las tres del medio, ya que en clases ventana
+# con un ojo, estos valores más o menos coinciden en todas.
 function differences(grayImage)
     rows = size(grayImage)[1]
     columns = size(grayImage)[2]
@@ -54,10 +67,6 @@ function differences(grayImage)
         end
     end
     #return diff_matrix
-
-    ############################################
-    # QUE DATOS SACAR DE AQUI ??
-    ############################################
 
     # OPCIÓN 1
     result = zeros(1,9)
@@ -75,8 +84,6 @@ function differences(grayImage)
     result[1,7] = mean(diff_matrix[end-2,:])
     result[1,8] = mean(diff_matrix[end-1,:])
     result[1,9] = mean(diff_matrix[end,:])
-
-    ############################################
 
     return result
 end
@@ -124,8 +131,31 @@ end
 
 
 
-##### featureExtraction
+##### featureExtraction1
+# Esta función se corresponde al caso de la aproximación 1, en la que tan solo
+# empleamos la media y desviación típica de los colores y del blanco
+function featureExtraction1(window::Array{Float64})
+    if typeof(window)==Array{Float64, 3}
+        char = zeros(1,6)
+        cnt = 1
+        for i=1:3
+            color = window[:,:,i]/mean(window[:,:,i]) #Brillo
+            char[1,cnt] = mean(color)
+            cnt += 1
+            char[1,cnt] = std(color)
+            cnt += 1
+        end
 
+    elseif typeof(window)==Array{Float64, 2}
+        window = window/mean(window)
+        char = zeros(1, 2)
+        char[1,1] = mean(window)
+        char[1,2] = std(window)
+    end
+
+    return char
+end
+"""
 function featureExtraction(window::Array{Float64})
     if typeof(window)==Array{Float64, 3}
         char = zeros(1,6)
@@ -146,15 +176,15 @@ function featureExtraction(window::Array{Float64})
 
     return char
 end
-
+"""
 
 ##### ClassifyEye
 
 function ClassifyEye(img, rna, threshold, NormalizationParameters, log=false)
     ColorDataset = funcionesUtiles.imageToColorArray(img)
     GrayDataset = funcionesUtiles.imageToGrayArray(img)
-    charC = featureExtraction(ColorDataset)
-    charG = featureExtraction(GrayDataset)
+    charC = featureExtraction1(ColorDataset)
+    charG = featureExtraction1(GrayDataset)
     char = hcat(charC, charG)
     normalizeMinMax!(char, NormalizationParameters)
     result = rna(char')
@@ -169,25 +199,48 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, log=false)
 end
 
 
+######################################################################
+########################### APROXIMACIÓN 1 ###########################
+######################################################################
+# Cargamos los dataset y extraemos las características
+(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
+inputsC = vcat(featureExtraction1.(colorDataset)...); #Caracteristicas de colores
+inputsG = vcat(featureExtraction1.(grayDataset)...); #Caracterísitcas de blanco
+inputs = [inputsC inputsG]; # Las juntamos
+positive = colorDataset[targets .== 1]; #################################
+# Normalizamos los inputs
+normalizeMinMax!(inputs);
+#Obtenemos los parámetros de normalización para usarlos en el test
+NormalizationParameters = calculateMinMaxNormalizationParameters(inputs);
 
-############################### CÓDIGO ###############################
+# NO ESTÁ ACABADO
+# CAMBIAR LA FUNCIÓN CLASSIFYEYE
+
+
+
+
+
+
+
+
+
 
 # Cargamos los dataset y extraemos las características
 (colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
-inputsC = vcat(featureExtraction.(colorDataset)...);
-inputsG = vcat(featureExtraction.(grayDataset)...);
-inputs = [inputsC inputsG];
+inputsC = vcat(featureExtraction1.(colorDataset)...); #Caracteristicas de colores
+inputsG = vcat(featureExtraction1.(grayDataset)...); #Caracterísitcas de blanco
+inputs = [inputsC inputsG]; # Las juntamos
 positive = colorDataset[targets .== 1];
 
 # Normalizamos los input y creamos en dataset de entrenamiento
-normalizeMinMax!(inputs);
-NormalizationParameters = calculateMinMaxNormalizationParameters(inputs);
+normalizeMinMax!(inputs); # Normalizamos los inputs
+NormalizationParameters = calculateMinMaxNormalizationParameters(inputs); #Obtenemos los parámetros de normalización para usarlos en el test
 targetsMatrix = reshape(targets, length(targets), 1);
 trainingDataset = (inputs, targetsMatrix)
 
 # Entrenamos la red
 (rna,losses) = trainClassANN([4], trainingDataset);
-detectionThreshold = 0.8;
+detectionThreshold = 0.8; #umbral para la detección de ojos
 
 # Comprobamos su funcionamiento
 function check(folderName::String)
@@ -234,11 +287,11 @@ parameters["validationRatio"] = validationRatio;
 parameters["numExecutions"] = numRepetitionsAANTraining;
 parameters["maxEpochs"] = numMaxEpochs;
 parameters["maxEpochsVal"] = maxEpochsVal;
-#modelCrossValidation(:ANN, parameters, inputsG, targets, k)
+modelCrossValidation(:ANN, parameters, inputs, targets, k)
 
 
 # Utilizamos la red para detectar ojos
-img_path = "testFinal/image_0263.jpg";
+img_path = "testFinal/image_0443.jpg";
 img = load(img_path);
 display(img)
 
