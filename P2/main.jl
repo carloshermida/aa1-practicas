@@ -140,13 +140,19 @@ function sixDivision(window)
         divisions[i] += 1
     end
 
-    pos = divisions[1]
-    window[:,(1:pos)]
-    next_pos
+    for i = 2:length(divisions)
+        divisions[i] += divisions[i-1]
+    end
 
-    pos += divisons[2]
-    window[:,(pos+1:pos)]
+    divisions = Int.(divisions)
+    windows = convert(Array{Any,1}, zeros(0))
+    push!(windows, window[:,(1:divisions[1])])
 
+    for j = 1:5
+        push!(windows, window[:,(divisions[j]+1:divisions[j+1])])
+    end
+
+    return windows
 
 end
 
