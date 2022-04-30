@@ -130,7 +130,8 @@ display(x)
 
 
 ##### sixDivision
-# Con esta función lo que haremos es
+# Con esta función lo que haremos es dividir el ancho de una ventana entre 6
+# y crear subventanas para mirar sus caracteríticas por separado
 function sixDivision(window)
     columns = size(window)[2]
     x = div(columns,6)
@@ -241,8 +242,9 @@ end
 
 ##### featureExtraction4
 # Esta función se corresponde al caso de la aproximación 4, en la que
-# empleamos la media y desviación típica de los colores y del blanco, así como la
-# simetría  de las capas de las matrices de colores
+# empleamos la media y desviación típica de los colores, así como la
+# simetría respecto a los dos ejes de las capas de las matrices de colores y los
+# "bordes" de las imágenes en blanco y negro
 function featureExtraction4(window::Array{Float64})
     if typeof(window)==Array{Float64, 3}
         char = zeros(1,6)
@@ -265,8 +267,74 @@ function featureExtraction4(window::Array{Float64})
 end
 
 
-##### ClassifyEye
+##### featureExtraction5
+# Esta función se corresponde al caso de la aproximación 5, en la que
+# empleamos la media y desviación típica de los colores, así como la
+# media y desviación típica de la cantidad de blanco de las subventanas
+function featureExtraction5(window::Array{Float64})
+    if typeof(window)==Array{Float64, 3}
+        char = zeros(1,6)
+        cnt = 1
+        for i=1:3
+            color = window[:,:,i]/mean(window[:,:,i])
+            char[1,cnt] = mean(color)
+            cnt += 1
+            char[1,cnt] = std(color)
+            cnt += 1
+        end
 
+    elseif typeof(window)==Array{Float64, 2}
+        window = window/mean(window)
+        parts = sixDivision(window)
+        char = zeros(0)
+        for p in parts
+            push!(char, mean(p))
+            push!(char, std(p))
+        end
+        char = char'
+    end
+
+    return char
+end
+
+##### featureExtraction6
+# Esta función se corresponde al caso de la aproximación 6, en la que
+# empleamos la media y desviación típica de los colores y del blanco, así como la
+# simetría  de las capas de las matrices de colores
+function featureExtraction6(window::Array{Float64})
+    if typeof(window)==Array{Float64, 3}
+        char = zeros(1,6)
+        cnt = 1
+        for i=1:3
+            color = window[:,:,i]/mean(window[:,:,i])
+            char[1,cnt] = mean(color)
+            cnt += 1
+            char[1,cnt] = std(color)
+            cnt += 1
+            char = hcat(char, symmetryVH(color))
+            # char = hcat(char, symmetryH(color))
+        end
+
+    elseif typeof(window)==Array{Float64, 2}
+        window = window/mean(window)
+        parts = sixDivision(window)
+        char = zeros(1,4)
+        char[1,1] = mean(parts[2])
+        char[1,2] = std(parts[2])
+        char[1,3] = mean(parts[5])
+        char[1,4] = std(parts[5])
+    end
+
+    return char
+end
+
+
+##### ClassifyEye
+# Esta función recibe una ventana y decide si en ella hay un ojo o no a partir
+# de las caraterísticas que se obtienen con las featureExtraction (dependiendo
+# de la aprpximación indicada escoge una u otra)
+# Con la probabilidad que obtiene la red, y en función del umbral (threshold)
+# indicado, decide si se considera como un ojo o no
 function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox, log=false)
     ColorDataset = funcionesUtiles.imageToColorArray(img)
     GrayDataset = funcionesUtiles.imageToGrayArray(img)
@@ -282,6 +350,12 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox, log=fa
     elseif aprox == 4
         charC = featureExtraction4(ColorDataset)
         charG = featureExtraction4(GrayDataset)
+    elseif aprox == 5
+        charC = featureExtraction5(ColorDataset)
+        charG = featureExtraction5(GrayDataset)
+    elseif aprox == 6
+        charC = featureExtraction6(ColorDataset)
+        charG = featureExtraction6(GrayDataset)
     end
     char = hcat(charC, charG)
     normalizeMinMax!(char, NormalizationParameters)
@@ -297,12 +371,20 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox, log=fa
 end
 
 ############################### CÓDIGO ###############################
+# Obtenemos los datos de cada imagen
+(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
+#Calculamos el tamaño de ventanas que va a usar en el test
+minWindowSizeY = minimum(size.(colorDataset, 1));
+maxWindowSizeY = maximum(size.(colorDataset, 1));
+minWindowSizeX = minimum(size.(colorDataset, 2));
+maxWindowSizeX = maximum(size.(colorDataset, 2));
+# Obtenemos todas las imágnes de test
+images = funcionesUtiles.loadFolderImagesTest("testFinal")
 
 ######################################################################
 ########################### APROXIMACIÓN 1 ###########################
 ######################################################################
 # Cargamos los dataset y extraemos las características
-(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
 inputsC = vcat(featureExtraction1.(colorDataset)...); #Caracteristicas de colores
 inputsG = vcat(featureExtraction1.(grayDataset)...); #Caracterísitcas de blanco
 inputs = [inputsC inputsG]; # Las juntamos
@@ -339,14 +421,6 @@ modelCrossValidation(:ANN, parameters, inputs, targets, k)
 # consideraremos que son ojos
 (rna,losses) = trainClassANN([4], trainingDataset);
 detectionThreshold = 0.8;
-# Y lo aplicamos a las imágenes finales
-images = funcionesUtiles.loadFolderImagesTest("testFinal")
-
-#Calculamos el tamaño de ventanas que va a usar
-minWindowSizeY = minimum(size.(colorDataset, 1));
-maxWindowSizeY = maximum(size.(colorDataset, 1));
-minWindowSizeX = minimum(size.(colorDataset, 2));
-maxWindowSizeX = maximum(size.(colorDataset, 2));
 # Hacemos el test final para cada imagen
 for img in images
     windowLocations = Array{Int64,1}[];
@@ -375,7 +449,6 @@ end
 ########################### APROXIMACIÓN 2 ###########################
 ######################################################################
 # Cargamos los dataset y extraemos las características
-(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
 inputsC = vcat(featureExtraction2.(colorDataset)...); #Caracteristicas de colores
 inputsG = vcat(featureExtraction2.(grayDataset)...); #Caracterísitcas de blanco
 inputs = [inputsC inputsG]; # Las juntamos
@@ -412,14 +485,7 @@ modelCrossValidation(:ANN, parameters, inputs, targets, k)
 # consideraremos que son ojos
 (rna,losses) = trainClassANN([2, 2], trainingDataset);
 detectionThreshold = 0.85;
-# Y lo aplicamos a las imágenes finales
-images = funcionesUtiles.loadFolderImagesTest("testFinal")
 
-#Calculamos el tamaño de ventanas que va a usar
-minWindowSizeY = minimum(size.(colorDataset, 1));
-maxWindowSizeY = maximum(size.(colorDataset, 1));
-minWindowSizeX = minimum(size.(colorDataset, 2));
-maxWindowSizeX = maximum(size.(colorDataset, 2));
 # Hacemos el test final para cada imagen
 for img in images
     windowLocations = Array{Int64,1}[];
@@ -449,7 +515,6 @@ end
 ########################### APROXIMACIÓN 3 ###########################
 ######################################################################
 # Cargamos los dataset y extraemos las características
-(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
 inputsC = vcat(featureExtraction3.(colorDataset)...); #Caracteristicas de colores
 inputsG = vcat(featureExtraction3.(grayDataset)...); #Caracterísitcas de blanco
 inputs = [inputsC inputsG]; # Las juntamos
@@ -467,14 +532,7 @@ trainingDataset = (inputs, targetsMatrix)
 # consideraremos que son ojos
 (rna,losses) = trainClassANN([2, 2], trainingDataset);
 detectionThreshold = 0.85;
-# Y lo aplicamos a las imágenes finales
-images = funcionesUtiles.loadFolderImagesTest("testFinal")
 
-#Calculamos el tamaño de ventanas que va a usar
-minWindowSizeY = minimum(size.(colorDataset, 1));
-maxWindowSizeY = maximum(size.(colorDataset, 1));
-minWindowSizeX = minimum(size.(colorDataset, 2));
-maxWindowSizeX = maximum(size.(colorDataset, 2));
 # Hacemos el test final para cada imagen
 for img in images
     windowLocations = Array{Int64,1}[];
@@ -504,7 +562,6 @@ end
 ########################### APROXIMACIÓN 4 ###########################
 ######################################################################
 # Cargamos los dataset y extraemos las características
-(colorDataset, grayDataset, targets) = funcionesUtiles.loadTrainingDataset();
 inputsC = vcat(featureExtraction4.(colorDataset)...); #Caracteristicas de colores
 inputsG = vcat(featureExtraction4.(grayDataset)...); #Caracterísitcas de blanco
 inputs = [inputsC inputsG]; # Las juntamos
@@ -541,14 +598,7 @@ modelCrossValidation(:ANN, parameters, inputs, targets, k)
 # consideraremos que son ojos
 (rna,losses) = trainClassANN([2, 2], trainingDataset);
 detectionThreshold = 0.85;
-# Y lo aplicamos a las imágenes finales
-images = funcionesUtiles.loadFolderImagesTest("testFinal")
 
-#Calculamos el tamaño de ventanas que va a usar
-minWindowSizeY = minimum(size.(colorDataset, 1));
-maxWindowSizeY = maximum(size.(colorDataset, 1));
-minWindowSizeX = minimum(size.(colorDataset, 2));
-maxWindowSizeX = maximum(size.(colorDataset, 2));
 # Hacemos el test final para cada imagen
 for img in images
     windowLocations = Array{Int64,1}[];
@@ -573,6 +623,136 @@ for img in images
     display(testImage)
 end
 
+######################################################################
+########################### APROXIMACIÓN 5 ###########################
+######################################################################
+# Cargamos los dataset y extraemos las características
+inputsC = vcat(featureExtraction5.(colorDataset)...); #Caracteristicas de colores
+inputsG = vcat(featureExtraction5.(grayDataset)...); #Caracterísitcas de blanco
+inputs = [inputsC inputsG]; # Las juntamos
+positive = colorDataset[targets .== 1]; ##########################
+# Normalizamos los inputs
+normalizeMinMax!(inputs);
+#Obtenemos los parámetros de normalización para usarlos en el test
+NormalizationParameters = calculateMinMaxNormalizationParameters(inputs);
+# Creamos el dataset de entrenamiento
+targetsMatrix = reshape(targets, length(targets), 1);
+trainingDataset = (inputs, targetsMatrix)
+
+# Comenzamos probando el funcionamiento con validación cruzada
+# Definimos los parámteros
+k = 10;
+topology = [2, 2];
+learningRate = 0.01;
+numMaxEpochs = 1000;
+validationRatio = 0;
+maxEpochsVal = 6;
+numRepetitionsAANTraining = 50;
+# Creamos el diccionario que los guarda y que le pasaremos a la red
+parameters = Dict();
+parameters["topology"] = topology;
+parameters["learningRate"] = learningRate;
+parameters["validationRatio"] = validationRatio;
+parameters["numExecutions"] = numRepetitionsAANTraining;
+parameters["maxEpochs"] = numMaxEpochs;
+parameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, parameters, inputs, targets, k)
+
+# Probamos ahora con el test real
+# Para ello primero entrenamos la red e indicamos el valor a partir del que
+# consideraremos que son ojos
+(rna,losses) = trainClassANN([2, 2], trainingDataset);
+detectionThreshold = 0.85;
+
+# Hacemos el test final para cada imagen
+for img in images
+    windowLocations = Array{Int64,1}[];
+    for windowWidth = minWindowSizeX:4:maxWindowSizeX
+        for windowHeight = minWindowSizeY:4:maxWindowSizeY
+            for x1 = 1:10:size(img,2)-windowWidth
+                for y1 = 1:10:size(img,1)-windowHeight
+                    x2 = x1 + windowWidth;
+                    y2 = y1 + windowHeight;
+                    if ClassifyEye(img[y1:y2, x1:x2], rna, detectionThreshold, NormalizationParameters, 5) == 1
+                        push!(windowLocations, [x1, x2, y1, y2]);
+                    end
+                end
+            end
+        end
+    end
+
+    testImage = funcionesUtiles.imageToColorArray(img);
+    for i=1:size(windowLocations)[1]
+        funcionesUtiles.setRedBox!(testImage, windowLocations[i][1],windowLocations[i][2],windowLocations[i][3],windowLocations[i][4])
+    end
+    display(testImage)
+end
+
+
+######################################################################
+########################### APROXIMACIÓN 6 ###########################
+######################################################################
+# Cargamos los dataset y extraemos las características
+inputsC = vcat(featureExtraction6.(colorDataset)...); #Caracteristicas de colores
+inputsG = vcat(featureExtraction6.(grayDataset)...); #Caracterísitcas de blanco
+inputs = [inputsC inputsG]; # Las juntamos
+positive = colorDataset[targets .== 1]; ##########################
+# Normalizamos los inputs
+normalizeMinMax!(inputs);
+#Obtenemos los parámetros de normalización para usarlos en el test
+NormalizationParameters = calculateMinMaxNormalizationParameters(inputs);
+# Creamos el dataset de entrenamiento
+targetsMatrix = reshape(targets, length(targets), 1);
+trainingDataset = (inputs, targetsMatrix)
+
+# Comenzamos probando el funcionamiento con validación cruzada
+# Definimos los parámteros
+k = 10;
+topology = [2, 2];
+learningRate = 0.01;
+numMaxEpochs = 1000;
+validationRatio = 0;
+maxEpochsVal = 6;
+numRepetitionsAANTraining = 50;
+# Creamos el diccionario que los guarda y que le pasaremos a la red
+parameters = Dict();
+parameters["topology"] = topology;
+parameters["learningRate"] = learningRate;
+parameters["validationRatio"] = validationRatio;
+parameters["numExecutions"] = numRepetitionsAANTraining;
+parameters["maxEpochs"] = numMaxEpochs;
+parameters["maxEpochsVal"] = maxEpochsVal;
+modelCrossValidation(:ANN, parameters, inputs, targets, k)
+
+# Probamos ahora con el test real
+# Para ello primero entrenamos la red e indicamos el valor a partir del que
+# consideraremos que son ojos
+(rna,losses) = trainClassANN([2, 2], trainingDataset);
+detectionThreshold = 0.85;
+
+# Hacemos el test final para cada imagen
+for img in images
+    windowLocations = Array{Int64,1}[];
+    for windowWidth = minWindowSizeX:4:maxWindowSizeX
+        for windowHeight = minWindowSizeY:4:maxWindowSizeY
+            for x1 = 1:10:size(img,2)-windowWidth
+                for y1 = 1:10:size(img,1)-windowHeight
+                    x2 = x1 + windowWidth;
+                    y2 = y1 + windowHeight;
+                    if ClassifyEye(img[y1:y2, x1:x2], rna, detectionThreshold, NormalizationParameters, 6) == 1
+                        push!(windowLocations, [x1, x2, y1, y2]);
+                    end
+                end
+            end
+        end
+    end
+
+    testImage = funcionesUtiles.imageToColorArray(img);
+    for i=1:size(windowLocations)[1]
+        funcionesUtiles.setRedBox!(testImage, windowLocations[i][1],windowLocations[i][2],windowLocations[i][3],windowLocations[i][4])
+    end
+    display(testImage)
+end
 
 
 
