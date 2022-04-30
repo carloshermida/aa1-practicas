@@ -45,7 +45,7 @@ module funcionesUtiles
         targets = [trues(length(positivesColor)); falses(length(negativesColor))];
         return ([positivesColor; negativesColor], [positivesGray; negativesGray], targets);
     end;
-    loadTestDataset() = ((colorMatrix,_) = loadFolderImages("test"); return colorMatrix; );
+    loadTestDataset() = ((colorMatrix,_) = loadFolderImages("testFinal"); return colorMatrix; );
 
     # Function to set a red box on a window on a color image represented as a 3D Float64 Array
     function setRedBox!(testImage::Array{Float64,3}, minx::Int64, maxx::Int64, miny::Int64, maxy::Int64)
@@ -80,4 +80,23 @@ module funcionesUtiles
     # setRedBox!(colorTestDataset[1], 10, 100, 10, 200);
     # # Display this image
     # display(colorTestDataset[1]);
-end
+
+
+    # Function to read all of the images in a folder and return them as 2 Float64 arrays: one with color components (3D array) and the other with grayscale components (2D array)
+    function loadFolderImagesTest(folderName::String)
+        isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG", ".BMP"]);
+        images = [];
+        for fileName in readdir(folderName)
+            if isImageExtension(fileName)
+                image = load(string(folderName, "/", fileName));
+                # Check that they are color images
+                # @assert(isa(image, Array{RGBA{Normed{UInt8,8}},2}) || isa(image, Array{RGB{Normed{UInt8,8}},2}))
+                @assert(isa(image, Array{<:Colorant,2}))
+                # Add the image to the vector of images
+                push!(images, image);
+            end;
+        end;
+        # Convert the images to arrays by broadcasting the conversion functions, and return the resulting vectors
+        return images;
+    end;
+end;
