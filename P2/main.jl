@@ -117,7 +117,7 @@ display(img)
 grayImage = funcionesUtiles.imageToGrayArray(img);
 grayImage = grayImage/mean(grayImage) #BRILLO
 x = differences(grayImage)
-display(x)
+#display(x)
 
 
 img_path = "negativos/2.bmp";
@@ -126,7 +126,7 @@ display(img)
 grayImage = funcionesUtiles.imageToGrayArray(img);
 grayImage = grayImage/mean(grayImage) #BRILLO
 x = differences(grayImage)
-display(x)
+#display(x)
 
 
 ##### sixDivision
@@ -335,7 +335,7 @@ end
 # de la aprpximación indicada escoge una u otra)
 # Con la probabilidad que obtiene la red, y en función del umbral (threshold)
 # indicado, decide si se considera como un ojo o no
-function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox, log=false)
+function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox)
     ColorDataset = funcionesUtiles.imageToColorArray(img)
     GrayDataset = funcionesUtiles.imageToGrayArray(img)
     if aprox == 1
@@ -360,9 +360,6 @@ function ClassifyEye(img, rna, threshold, NormalizationParameters, aprox, log=fa
     char = hcat(charC, charG)
     normalizeMinMax!(char, NormalizationParameters)
     result = rna(char')
-    if log
-        print(result)
-    end
     if result[1] >= threshold
         return 1
     else
@@ -753,37 +750,3 @@ for img in images
     end
     display(testImage)
 end
-
-
-
-
-
-
-######################## COSAS DE CARLOS #########################
-# Comprobamos su funcionamiento
-function check(folderName::String)
-    isImageExtension(fileName::String) = any(uppercase(fileName[end-3:end]) .== [".JPG", ".PNG", ".BMP"]);
-    images = [];
-    for fileName in readdir(folderName)
-        if isImageExtension(fileName)
-            image = load(string(folderName, "/", fileName));
-            @assert(isa(image, Array{<:Colorant,2}))
-            push!(images, image);
-        end;
-    end;
-    return images
-end
-
-### Positivos
-pos_check = zeros(0);
-for item in check("positivos")
-    push!(pos_check, ClassifyEye(item, rna, detectionThreshold, NormalizationParameters, true))
-end
-sum(pos_check)
-
-### Negativos
-neg_check = zeros(0);
-for item in check("negativos")
-    push!(neg_check, ClassifyEye(item, rna, detectionThreshold, NormalizationParameters, true))
-end
-sum(neg_check)
