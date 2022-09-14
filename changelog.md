@@ -1,5 +1,7 @@
 ### Changelog
 
+###### _Disclaimer: Algunos commits fueron publicados tras demasiadas horas de prueba y error_
+
 ---
 
 ###### 14/09/22
